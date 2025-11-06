@@ -1,0 +1,43 @@
+name: db_asm_3
+services:
+  scylla:
+    container_name: scylla
+    image: scylladb/scylla:latest
+    command: --smp 1 --memory 750M
+    restart: unless-stopped
+    ports:
+      - 9042:9042 
+    networks:
+      main:
+
+  scylla-init:
+    container_name: scylla-init
+    image: scylladb/scylla:latest
+    volumes:
+      - ./db_seed/scylla/create_schema.cql:/scylla_scripts/create_schema.cql
+      - ./db_seed/scylla/init.sh:/scylla_scripts/init.sh
+    entrypoint: [ "bash", "/scylla_scripts/init.sh" ]
+    networks:
+      main:
+
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: asm3
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: asm3_db
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      main:
+  
+networks:
+  main:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
