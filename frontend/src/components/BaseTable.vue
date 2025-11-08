@@ -8,7 +8,7 @@
         {{ title }}
       </h2>
       <button class="btn shadow-lg" :class="buttonClass" @click="$emit('add')">
-        <Add class="w-4 h-4" />
+        <PlusIcon />
         {{ addButtonText }}
       </button>
     </div>
@@ -44,11 +44,11 @@
             <td>
               <div class="flex gap-2">
                 <button class="btn btn-sm btn-secondary btn-outline" @click="$emit('edit', item)">
-                  <Edit class="w-4 h-4" />
+                  <Pencil :className="'w-4 h-4'" />
                   Edit
                 </button>
                 <button class="btn btn-sm btn-error btn-outline" @click="$emit('delete', item)">
-                  <Delete class="w-4 h-4" />
+                  <DeleteIcon :className="'w-4 h-4'" />
                   Delete
                 </button>
               </div>
@@ -84,18 +84,11 @@
 </template>
 
 <script setup lang="ts">
-import { PropType, computed, ref } from 'vue'
-import Add from '@mui/icons-material/Add'
-import Edit from '@mui/icons-material/Edit'
-import Delete from '@mui/icons-material/Delete'
-
-interface TableColumn {
-  key: string
-  label: string
-  type?: 'text' | 'badge' | 'accent' | 'default'
-  badgeClass?: string
-  accentClass?: string
-}
+import { type PropType, computed, ref } from 'vue'
+import PlusIcon from 'vue-material-design-icons/Plus.vue'
+import Pencil from 'vue-material-design-icons/Pencil.vue'
+import DeleteIcon from 'vue-material-design-icons/Delete.vue'
+import type { TableColumn } from '../types'
 
 const props = defineProps({
   title: {
@@ -163,11 +156,6 @@ const goToPage = (page: number) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page
   }
-}
-
-// Reset to first page when data changes
-const resetPagination = () => {
-  currentPage.value = 1
 }
 
 // Watch for data changes to reset pagination

@@ -3,7 +3,7 @@
     title="Users"
     :data="users"
     :columns="columns"
-    :icon="People"
+    :icon="AccountGroup"
     add-button-text="Add User"
     border-class="border-primary"
     icon-bg-class="bg-primary/10"
@@ -20,15 +20,10 @@
 </template>
 
 <script setup lang="ts">
-import { PropType } from 'vue'
+import { type PropType } from 'vue'
 import BaseTable from './BaseTable.vue'
-import People from '@mui/icons-material/People'
-
-interface User {
-  id: number
-  username: string
-  email: string
-}
+import AccountGroup from 'vue-material-design-icons/AccountGroup.vue'
+import type { User, TableColumn } from '../types'
 
 const props = defineProps({
   users: {
@@ -48,9 +43,9 @@ const emit = defineEmits<{
 }>()
 
 const columns = [
-  { key: 'id', label: 'ID', type: 'badge', badgeClass: 'badge-primary' },
-  { key: 'username', label: 'Username', type: 'text' },
-  { key: 'email', label: 'Email', type: 'accent', accentClass: 'text-primary' },
+  { key: 'id', label: 'ID', type: 'badge' as const, badgeClass: 'badge-primary' },
+  { key: 'username', label: 'Username', type: 'text' as const },
+  { key: 'email', label: 'Email', type: 'accent' as const, accentClass: 'text-primary' },
 ]
 
 const handleAdd = () => {

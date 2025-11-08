@@ -27,7 +27,7 @@
       <!-- DaisyUI Tabs -->
       <div class="tabs tabs-lifted">
         <!-- Users Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="👥 Users (5)" checked="checked" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="👥 Users (5)" :checked="true" />
         <UserTable
           :users="users"
           :selected-database="selectedDatabase"
@@ -50,6 +50,7 @@
         <input type="radio" name="db_tabs" class="tab" aria-label="📢 Campaigns (6)" />
         <CampaignTable
           :campaigns="campaigns"
+          :organizations="organizations"
           :selected-database="selectedDatabase"
           @add="handleAddCampaign"
           @edit="handleEditCampaign"
@@ -60,6 +61,8 @@
         <input type="radio" name="db_tabs" class="tab" aria-label="📋 Applications (8)" />
         <ApplicationsTable
           :applications="applications"
+          :campaigns="campaigns"
+          :users="users"
           :selected-database="selectedDatabase"
           @add="handleAddApplication"
           @edit="handleEditApplication"
@@ -77,34 +80,7 @@ import UserTable from './UserTable.vue'
 import OrganizationTable from './OrganizationTable.vue'
 import CampaignTable from './CampaignTable.vue'
 import ApplicationsTable from './ApplicationsTable.vue'
-
-// Interfaces based on schemas.py
-interface User {
-  id: number
-  username: string
-  email: string
-}
-
-interface Organization {
-  id: number
-  name: string
-}
-
-interface CampaignData {
-  id: number
-  organizer_id: number
-  name: string
-}
-
-interface Application {
-  id: number
-  campaign_id: number
-  user_id: number
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
-}
-
-// Database selection
-type DatabaseType = 'postgres' | 'duckdb' | 'scylla'
+import type { User, Organization, CampaignData, Application, DatabaseType } from '../types'
 const selectedDatabase = ref<DatabaseType>('postgres')
 
 // Mock data

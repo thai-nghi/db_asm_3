@@ -3,7 +3,7 @@
     title="Organizations"
     :data="organizations"
     :columns="columns"
-    :icon="Business"
+    :icon="OfficeBuildingIcon"
     add-button-text="Add Organization"
     border-class="border-secondary"
     icon-bg-class="bg-secondary/10"
@@ -16,14 +16,10 @@
 </template>
 
 <script setup lang="ts">
-import { PropType } from 'vue'
+import { type PropType } from 'vue'
 import BaseTable from './BaseTable.vue'
-import Business from '@mui/icons-material/Business'
-
-interface Organization {
-  id: number
-  name: string
-}
+import OfficeBuildingIcon from 'vue-material-design-icons/OfficeBuilding.vue'
+import type { Organization } from '../types'
 
 const props = defineProps({
   organizations: {
@@ -43,8 +39,8 @@ const emit = defineEmits<{
 }>()
 
 const columns = [
-  { key: 'id', label: 'ID', type: 'badge', badgeClass: 'badge-secondary' },
-  { key: 'name', label: 'Name', type: 'text' },
+  { key: 'id', label: 'ID', type: 'badge' as const, badgeClass: 'badge-secondary' },
+  { key: 'name', label: 'Name', type: 'text' as const },
 ]
 
 const handleAdd = () => {

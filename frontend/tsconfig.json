@@ -1,7 +1,35 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "allowJs": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "module": "ES2020",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "lib": [
+      "dom",
+      "es2019"
+    ],
+    "checkJs": false,
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+    },
+    "baseUrl": "./src",
+    "allowSyntheticDefaultImports": true,
+    "verbatimModuleSyntax": false
+  }
 }
