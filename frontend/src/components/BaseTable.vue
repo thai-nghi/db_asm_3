@@ -1,5 +1,5 @@
 <template>
-  <div class="tab-content bg-base-100 rounded-box p-6 shadow-lg" :class="borderClass">
+  <div class="bg-base-100 rounded-box p-6 shadow-lg" :class="borderClass">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-semibold text-base-content flex items-center gap-2">
         <div class="p-2 rounded-lg" :class="iconBgClass">
@@ -47,10 +47,6 @@
                   <Pencil :className="'w-4 h-4'" />
                   Edit
                 </button>
-                <button class="btn btn-sm btn-error btn-outline" @click="$emit('delete', item)">
-                  <DeleteIcon :className="'w-4 h-4'" />
-                  Delete
-                </button>
               </div>
             </td>
           </tr>
@@ -87,7 +83,6 @@
 import { type PropType, computed, ref } from 'vue'
 import PlusIcon from 'vue-material-design-icons/Plus.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
-import DeleteIcon from 'vue-material-design-icons/Delete.vue'
 import type { TableColumn } from '../types'
 
 const props = defineProps({
@@ -136,7 +131,6 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: 'add'): void
   (e: 'edit', item: any): void
-  (e: 'delete', item: any): void
 }>()
 
 // Pagination state

@@ -9,7 +9,6 @@ import type {
   OrganizationUpdate,
   CampaignCreate,
   CampaignUpdate,
-  CampaignRequirementsCreate,
   CampaignApplicationCreate,
   CampaignApplicationUpdate
 } from "@/api";
@@ -55,19 +54,6 @@ export function useCreateCampaignMutation(dbType: Ref<DatabaseType>) {
   });
 }
 
-export function useCreateCampaignRequirementsMutation(dbType: Ref<DatabaseType>) {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (requirementsData: CampaignRequirementsCreate) => {
-      return api.createCampaignRequirements(dbType.value, requirementsData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["campaignRequirements", dbType] });
-    },
-  });
-}
-
 export function useCreateApplicationMutation(dbType: Ref<DatabaseType>) {
   const queryClient = useQueryClient();
   
@@ -76,7 +62,7 @@ export function useCreateApplicationMutation(dbType: Ref<DatabaseType>) {
       return api.createApplication(dbType.value, applicationData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["campaignApplications", dbType] });
+      queryClient.invalidateQueries({ queryKey: ["applications", dbType] });
     },
   });
 }
@@ -130,7 +116,7 @@ export function useUpdateApplicationMutation(dbType: Ref<DatabaseType>) {
       return api.updateApplication(dbType.value, applicationId, applicationData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["campaignApplications", dbType] });
+      queryClient.invalidateQueries({ queryKey: ["applications", dbType] });
     },
   });
 }

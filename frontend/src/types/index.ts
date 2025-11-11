@@ -12,10 +12,24 @@ export type Organization = {
   name: string
 }
 
+export type MediaType = 'photo' | 'video'
+
+export type Requirements = {
+  media_type: MediaType
+  count: number
+}
+
 export type CampaignData = {
   id: number
   organizer_id: number
   name: string
+  requirements: Requirements[]
+}
+
+export type CampaignCreateData = {
+  organizer_id: number
+  name: string
+  requirements: Requirements[]
 }
 
 export type Application = {

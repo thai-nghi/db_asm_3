@@ -1,9 +1,13 @@
 import { z } from 'zod'
-
 // Enums
 export const MediaTypeSchema = z.enum(['photo', 'video'])
 export const ApplicationStatusSchema = z.enum(['pending', 'accept', 'declined'])
 export const DatabaseTypeSchema = z.enum(['scylla', 'postgres', 'duckdb'])
+
+export const CampaignRequirements = z.object({
+  media_type: MediaTypeSchema,
+  count: z.number(),
+})
 
 // Response schemas based on backend schemas.py
 export const UserResponseSchema = z.object({
@@ -21,6 +25,7 @@ export const CampaignResponseSchema = z.object({
   id: z.number(),
   organizer_id: z.number(),
   name: z.string(),
+  requirements: z.array(CampaignRequirements),
 })
 
 export const CampaignRequirementsResponseSchema = z.object({
@@ -38,31 +43,27 @@ export const CampaignApplicationResponseSchema = z.object({
 
 // Create schemas
 export const UserCreateSchema = z.object({
-  id: z.number(),
   username: z.string(),
   email: z.string(),
   password: z.string(),
 })
 
 export const OrganizationCreateSchema = z.object({
-  id: z.number(),
   name: z.string(),
 })
 
 export const CampaignCreateSchema = z.object({
-  id: z.number(),
   organizer_id: z.number(),
   name: z.string(),
+  requirements: z.array(CampaignRequirements),
 })
 
 export const CampaignRequirementsCreateSchema = z.object({
-  id: z.number(),
   campaign_id: z.number(),
   media_type: MediaTypeSchema,
 })
 
 export const CampaignApplicationCreateSchema = z.object({
-  id: z.number(),
   campaign_id: z.number(),
   user_id: z.number(),
   status: ApplicationStatusSchema,
@@ -82,6 +83,7 @@ export const OrganizationUpdateSchema = z.object({
 export const CampaignUpdateSchema = z.object({
   organizer_id: z.number().optional(),
   name: z.string().optional(),
+  requirements: z.array(CampaignRequirements).optional(),
 })
 
 export const CampaignRequirementsUpdateSchema = z.object({
@@ -161,7 +163,7 @@ export async function getOrganizations(dbType: DatabaseType) {
   return z.array(OrganizationResponseSchema).parse(response)
 }
 
-export async function getCampaigns(dbType: DatabaseType, organizationId?: number) {
+export async function getCampaigns(dbType: DatabaseType, organizationId?: number | null) {
   const params = organizationId ? `?organization_id=${organizationId}` : ''
   const response = await apiRequest<CampaignResponse[]>(`/${dbType}/campaigns${params}`)
   return z.array(CampaignResponseSchema).parse(response)
@@ -169,6 +171,16 @@ export async function getCampaigns(dbType: DatabaseType, organizationId?: number
 
 export async function getCampaignApplications(dbType: DatabaseType, campaignId: number) {
   const response = await apiRequest<CampaignApplicationResponse[]>(`/${dbType}/campaigns/${campaignId}/applications`)
+  return z.array(CampaignApplicationResponseSchema).parse(response)
+}
+
+export async function getApplications(dbType: DatabaseType, campaignId?: number | null, userId?: number | null) {
+  const params = new URLSearchParams()
+  if (campaignId) params.append('campaign_id', campaignId.toString())
+  if (userId) params.append('user_id', userId.toString())
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  
+  const response = await apiRequest<CampaignApplicationResponse[]>(`/${dbType}/applications${queryString}`)
   return z.array(CampaignApplicationResponseSchema).parse(response)
 }
 
@@ -196,14 +208,6 @@ export async function createCampaign(dbType: DatabaseType, campaignData: Campaig
     body: JSON.stringify(campaignData),
   })
   return CampaignResponseSchema.parse(response)
-}
-
-export async function createCampaignRequirements(dbType: DatabaseType, requirementsData: CampaignRequirementsCreate) {
-  const response = await apiRequest<CampaignRequirementsResponse>(`/${dbType}/campaign-requirements`, {
-    method: 'POST',
-    body: JSON.stringify(requirementsData),
-  })
-  return CampaignRequirementsResponseSchema.parse(response)
 }
 
 export async function createApplication(dbType: DatabaseType, applicationData: CampaignApplicationCreate) {
@@ -255,12 +259,12 @@ const api = {
   getOrganizations,
   getCampaigns,
   getCampaignApplications,
+  getApplications,
   
   // CREATE ENDPOINTS
   createUser,
   createOrganization,
   createCampaign,
-  createCampaignRequirements,
   createApplication,
   
   // UPDATE ENDPOINTS

@@ -27,45 +27,38 @@
       <!-- DaisyUI Tabs -->
       <div class="tabs tabs-lifted">
         <!-- Users Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="👥 Users (5)" :checked="true" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="👥 Users" :checked="true" />
         <UserTable
-          :users="users"
+          :users="users || []"
           :selected-database="selectedDatabase"
-          @add="handleAddUser"
-          @edit="handleEditUser"
           @delete="handleDeleteUser"
         />
 
         <!-- Organizations Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="🏢 Organizations (4)" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="🏢 Organizations" />
         <OrganizationTable
-          :organizations="organizations"
+          :organizations="organizations || []"
           :selected-database="selectedDatabase"
-          @add="handleAddOrganization"
-          @edit="handleEditOrganization"
           @delete="handleDeleteOrganization"
         />
 
         <!-- Campaigns Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="📢 Campaigns (6)" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="📢 Campaigns" />
         <CampaignTable
-          :campaigns="campaigns"
-          :organizations="organizations"
+          :campaigns="campaigns || []"
+          :organizations="organizations || []"
           :selected-database="selectedDatabase"
-          @add="handleAddCampaign"
-          @edit="handleEditCampaign"
+          :selected-organization-id="selectedOrganizationId"
           @delete="handleDeleteCampaign"
+          @update-organization-filter="handleUpdateOrganizationFilter"
         />
 
         <!-- Applications Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="📋 Applications (8)" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="📋 Applications" />
         <ApplicationsTable
-          :applications="applications"
-          :campaigns="campaigns"
-          :users="users"
+          :campaigns="campaigns || []"
+          :users="users || []"
           :selected-database="selectedDatabase"
-          @add="handleAddApplication"
-          @edit="handleEditApplication"
           @delete="handleDeleteApplication"
         />
       </div>
@@ -75,100 +68,56 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useQueryClient } from '@tanstack/vue-query'
 import UserTable from './UserTable.vue'
 import OrganizationTable from './OrganizationTable.vue'
 import CampaignTable from './CampaignTable.vue'
 import ApplicationsTable from './ApplicationsTable.vue'
+import { useUsersQuery, useOrganizationsQuery, useCampaignsQuery } from '@/hooks/queries'
 import type { User, Organization, CampaignData, Application, DatabaseType } from '../types'
+
 const selectedDatabase = ref<DatabaseType>('postgres')
 
-// Mock data
-const users = ref<User[]>([
-  { id: 1, username: 'john_doe', email: 'john@example.com' },
-  { id: 2, username: 'jane_smith', email: 'jane@example.com' },
-  { id: 3, username: 'mike_wilson', email: 'mike@example.com' },
-  { id: 4, username: 'sarah_connor', email: 'sarah@example.com' },
-  { id: 5, username: 'alex_jones', email: 'alex@example.com' }
-])
+// Get query client for invalidating queries
+const queryClient = useQueryClient()
 
-const organizations = ref<Organization[]>([
-  { id: 1, name: 'Tech Corp' },
-  { id: 2, name: 'Marketing Agency' },
-  { id: 3, name: 'Startup Inc' },
-  { id: 4, name: 'Global Solutions' }
-])
+// Organization filter for campaigns (null = all campaigns)
+const selectedOrganizationId = ref<number | null>(null)
 
-const campaigns = ref<CampaignData[]>([
-  { id: 1, organizer_id: 1, name: 'Summer Product Launch' },
-  { id: 2, organizer_id: 2, name: 'Brand Awareness Campaign' },
-  { id: 3, organizer_id: 1, name: 'Holiday Sales Push' },
-  { id: 4, organizer_id: 3, name: 'New User Acquisition' },
-  { id: 5, organizer_id: 4, name: 'Customer Retention Drive' },
-  { id: 6, organizer_id: 2, name: 'Social Media Boost' }
-])
+// Watch for database changes and invalidate all queries
+watch(selectedDatabase, async (newDb, oldDb) => {
+  if (newDb !== oldDb) {
+    console.log(`Database changed from ${oldDb} to ${newDb}, invalidating all queries`)
+    await queryClient.invalidateQueries()
+  }
+})
 
-const applications = ref<Application[]>([
-  { id: 1, campaign_id: 1, user_id: 1, status: 'PENDING' },
-  { id: 2, campaign_id: 1, user_id: 2, status: 'APPROVED' },
-  { id: 3, campaign_id: 2, user_id: 3, status: 'REJECTED' },
-  { id: 4, campaign_id: 2, user_id: 4, status: 'PENDING' },
-  { id: 5, campaign_id: 3, user_id: 5, status: 'APPROVED' },
-  { id: 6, campaign_id: 3, user_id: 1, status: 'PENDING' },
-  { id: 7, campaign_id: 4, user_id: 2, status: 'APPROVED' },
-  { id: 8, campaign_id: 5, user_id: 3, status: 'REJECTED' }
-])
+// Fetch data using query hooks
+const { data: users } = useUsersQuery(selectedDatabase)
+const { data: organizations } = useOrganizationsQuery(selectedDatabase)
+const { data: campaigns } = useCampaignsQuery(selectedDatabase, selectedOrganizationId)
 
-// Event handlers for User operations
-const handleAddUser = () => {
-  console.log('Add user', selectedDatabase.value)
-}
-
-const handleEditUser = (user: User) => {
-  console.log('Edit user', user, selectedDatabase.value)
-}
-
+// Event handlers for delete operations (create/edit handled internally)
 const handleDeleteUser = (user: User) => {
   console.log('Delete user', user, selectedDatabase.value)
-}
-
-// Event handlers for Organization operations
-const handleAddOrganization = () => {
-  console.log('Add organization', selectedDatabase.value)
-}
-
-const handleEditOrganization = (organization: Organization) => {
-  console.log('Edit organization', organization, selectedDatabase.value)
 }
 
 const handleDeleteOrganization = (organization: Organization) => {
   console.log('Delete organization', organization, selectedDatabase.value)
 }
 
-// Event handlers for Campaign operations
-const handleAddCampaign = () => {
-  console.log('Add campaign', selectedDatabase.value)
-}
-
-const handleEditCampaign = (campaign: CampaignData) => {
-  console.log('Edit campaign', campaign, selectedDatabase.value)
-}
-
 const handleDeleteCampaign = (campaign: CampaignData) => {
   console.log('Delete campaign', campaign, selectedDatabase.value)
 }
 
-// Event handlers for Application operations
-const handleAddApplication = () => {
-  console.log('Add application', selectedDatabase.value)
-}
-
-const handleEditApplication = (application: Application) => {
-  console.log('Edit application', application, selectedDatabase.value)
-}
-
 const handleDeleteApplication = (application: Application) => {
   console.log('Delete application', application, selectedDatabase.value)
+}
+
+// Organization filter handler for campaigns
+const handleUpdateOrganizationFilter = (organizationId: number | null) => {
+  selectedOrganizationId.value = organizationId
 }
 </script>
 

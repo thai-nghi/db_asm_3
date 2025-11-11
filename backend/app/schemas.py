@@ -8,6 +8,9 @@ class DatabaseType(str, Enum):
     POSTGRES = "postgres"
     DUCKDB = "duckdb"
 
+class CampaignRequirement(BaseModel):
+    media_type: MediaType
+    count: int
 
 # Response schemas
 class UserResponse(BaseModel):
@@ -21,16 +24,12 @@ class OrganizationResponse(BaseModel):
     name: str
 
 
+
 class CampaignResponse(BaseModel):
     id: int
     organizer_id: int
     name: str
-
-
-class CampaignRequirementsResponse(BaseModel):
-    id: int
-    campaign_id: int
-    media_type: MediaType
+    requirements: List[CampaignRequirement] = []
 
 
 class CampaignApplicationResponse(BaseModel):
@@ -42,31 +41,22 @@ class CampaignApplicationResponse(BaseModel):
 
 # Create schemas
 class UserCreate(BaseModel):
-    id: int
     username: str
     email: str
     password: str
 
 
 class OrganizationCreate(BaseModel):
-    id: int
     name: str
 
 
 class CampaignCreate(BaseModel):
-    id: int
     organizer_id: int
     name: str
-
-
-class CampaignRequirementsCreate(BaseModel):
-    id: int
-    campaign_id: int
-    media_type: MediaType
+    requirements: List[CampaignRequirement] = []
 
 
 class CampaignApplicationCreate(BaseModel):
-    id: int
     campaign_id: int
     user_id: int
     status: ApplicationStatus
@@ -86,11 +76,7 @@ class OrganizationUpdate(BaseModel):
 class CampaignUpdate(BaseModel):
     organizer_id: Optional[int] = None
     name: Optional[str] = None
-
-
-class CampaignRequirementsUpdate(BaseModel):
-    campaign_id: Optional[int] = None
-    media_type: Optional[MediaType] = None
+    requirements: Optional[List[CampaignRequirement]] = None
 
 
 class CampaignApplicationUpdate(BaseModel):

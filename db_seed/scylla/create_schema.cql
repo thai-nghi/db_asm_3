@@ -2,7 +2,7 @@
 CREATE KEYSPACE IF NOT EXISTS asm3_db
 WITH REPLICATION = {
     'class': 'SimpleStrategy',
-    'replication_factor': 3
+    'replication_factor': 1
 };
 
 USE asm3_db;
@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS campaign (
 -- Note: ScyllaDB doesn't have ENUMs, so we use text with validation in application layer
 CREATE TABLE IF NOT EXISTS campaign_requirements (
     id int PRIMARY KEY,
+    count int,
     campaign_id int,
     media_type text -- 'photo' or 'video'
 );
@@ -76,3 +77,24 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS requirements_by_campaign AS
     SELECT * FROM campaign_requirements
     WHERE campaign_id IS NOT NULL AND id IS NOT NULL
     PRIMARY KEY (campaign_id, id);
+
+-- View for requirements by media type (for filtering by media type)
+CREATE MATERIALIZED VIEW IF NOT EXISTS requirements_by_media_type AS
+    SELECT * FROM campaign_requirements
+    WHERE media_type IS NOT NULL AND id IS NOT NULL
+    PRIMARY KEY (media_type, id);
+
+-- Create support key table
+CREATE TABLE IF NOT EXISTS sequence_id (
+    id int PRIMARY KEY,
+    user_sequence int,
+    campaign_sequence int,
+    organization_sequence int,
+    application_sequence int,
+    requirements_sequence int
+);
+
+-- Insert initial sequence values
+INSERT INTO sequence_id (id, user_sequence, campaign_sequence, organization_sequence, application_sequence, requirements_sequence)
+VALUES (0, 1, 1, 1, 1, 1);
+

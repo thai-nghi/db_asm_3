@@ -32,13 +32,14 @@ async def campaigns(
     return db.all_campaigns(db_type, organization_id)
 
 
-@router.get("/{db_type}/campaigns/{campaign_id}/applications", response_model=list[schemas.CampaignApplicationResponse])
+@router.get("/{db_type}/applications", response_model=list[schemas.CampaignApplicationResponse])
 async def campaign_applications(
-    campaign_id: int = fastapi.Path(...),
     db: Connector = fastapi.Depends(get_db_connector),
-    db_type: schemas.DatabaseType = fastapi.Path(...)
+    db_type: schemas.DatabaseType = fastapi.Path(...),
+    user_id: Optional[int] = fastapi.Query(None),
+    campaign_id: Optional[int] = fastapi.Query(None),
 ) -> list[schemas.CampaignApplicationResponse]:
-    return db.campaign_applications(db_type, campaign_id)
+    return db.campaign_applications(db_type, campaign_id, user_id)
 
 
 # CREATE ENDPOINTS
@@ -76,18 +77,6 @@ async def create_campaign(
     result = db.create_campaign(db_type, campaign_data)
     if result is None:
         raise fastapi.HTTPException(status_code=500, detail="Failed to create campaign")
-    return result
-
-
-@router.post("/{db_type}/campaign-requirements", response_model=schemas.CampaignRequirementsResponse)
-async def create_campaign_requirements(
-    requirements_data: schemas.CampaignRequirementsCreate,
-    db: Connector = fastapi.Depends(get_db_connector),
-    db_type: schemas.DatabaseType = fastapi.Path(...)
-) -> schemas.CampaignRequirementsResponse:
-    result = db.create_campaign_requirements(db_type, requirements_data)
-    if result is None:
-        raise fastapi.HTTPException(status_code=500, detail="Failed to create campaign requirements")
     return result
 
 
@@ -142,7 +131,6 @@ async def update_campaign(
     if result is None:
         raise fastapi.HTTPException(status_code=404, detail="Campaign not found")
     return result
-
 
 @router.put("/{db_type}/applications/{application_id}", response_model=schemas.CampaignApplicationResponse)
 async def update_application(

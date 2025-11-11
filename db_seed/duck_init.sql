@@ -2,38 +2,44 @@
 -- Note: DuckDB doesn't support ENUMs, so we use VARCHAR with CHECK constraints
 
 -- Create user table
+CREATE SEQUENCE user_id_seq START 1;
 CREATE TABLE "user" (
-  "id" INTEGER PRIMARY KEY,
+  "id" INTEGER PRIMARY KEY DEFAULT nextval('user_id_seq'),
   "username" VARCHAR,
   "email" VARCHAR,
   "password" VARCHAR
 );
 
+
 -- Create organization table
+CREATE SEQUENCE organization_id_seq START 1;
 CREATE TABLE "organization" (
-  "id" INTEGER PRIMARY KEY,
+  "id" INTEGER PRIMARY KEY DEFAULT nextval('organization_id_seq'),
   "name" VARCHAR
 );
 
 -- Create campaign table
+CREATE SEQUENCE campaign_id_seq START 1;
 CREATE TABLE "campaign" (
-  "id" INTEGER PRIMARY KEY,
+  "id" INTEGER PRIMARY KEY DEFAULT nextval('campaign_id_seq'),
   "organizer_id" INTEGER,
   "name" VARCHAR
 );
 
 -- Create campaign_requirements table
 -- Using VARCHAR with CHECK constraint instead of ENUM
+CREATE SEQUENCE campaign_requirements_id_seq START 1;
 CREATE TABLE "campaign_requirements" (
-  "id" INTEGER PRIMARY KEY,
+  "id" INTEGER PRIMARY KEY DEFAULT nextval('campaign_requirements_id_seq'),
   "campaign_id" INTEGER,
   "media_type" VARCHAR CHECK (media_type IN ('photo', 'video'))
 );
 
 -- Create campaign_application table
 -- Using VARCHAR with CHECK constraint instead of ENUM
+CREATE SEQUENCE campaign_application_id_seq START 1;
 CREATE TABLE "campaign_application" (
-  "id" INTEGER PRIMARY KEY,
+  "id" INTEGER PRIMARY KEY DEFAULT nextval('campaign_application_id_seq'),
   "campaign_id" INTEGER,
   "user_id" INTEGER,
   "status" VARCHAR CHECK (status IN ('pending', 'accept', 'declined'))

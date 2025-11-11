@@ -30,6 +30,7 @@ CREATE TABLE "campaign" (
 CREATE TABLE "campaign_requirements" (
   "id" int PRIMARY KEY,
   "campaign_id" int,
+  "count" int,
   "media_type" media_type
 );
 

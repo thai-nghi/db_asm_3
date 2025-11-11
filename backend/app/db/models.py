@@ -14,7 +14,7 @@ class ApplicationStatus(str, Enum):
     declined = "declined"
 
 class User(SQLModel, table=True):
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     username: str
     email: str
     password: str
@@ -24,7 +24,7 @@ class User(SQLModel, table=True):
 
 
 class Organization(SQLModel, table=True):
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     name: str
 
     # Relationship to campaigns organized by this organization
@@ -32,7 +32,7 @@ class Organization(SQLModel, table=True):
 
 
 class Campaign(SQLModel, table=True):
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     organizer_id: int = Field(foreign_key="organization.id")
     name: str
 
@@ -45,9 +45,10 @@ class Campaign(SQLModel, table=True):
 class CampaignRequirements(SQLModel, table=True):
     __tablename__ = "campaign_requirements"
     
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     campaign_id: int = Field(foreign_key="campaign.id")
     media_type: MediaType
+    count: int
 
     # Relationship
     campaign: Campaign = Relationship(back_populates="requirements")
@@ -56,7 +57,7 @@ class CampaignRequirements(SQLModel, table=True):
 class CampaignApplication(SQLModel, table=True):
     __tablename__ = "campaign_application"
     
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     campaign_id: int = Field(foreign_key="campaign.id")
     user_id: int = Field(foreign_key="user.id")
     status: ApplicationStatus

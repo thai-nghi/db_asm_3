@@ -2,4 +2,4 @@ from cassandra.cluster import Cluster
 from app.settings import settings
 
 cluster = Cluster([settings.scylla_url])
-session = cluster.connect()
+session = cluster.connect(keyspace="asm3_db")
