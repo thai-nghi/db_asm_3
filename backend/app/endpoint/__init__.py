@@ -29,8 +29,8 @@ async def campaigns(
     db_type: schemas.DatabaseType = fastapi.Path(...),
     organization_id: Optional[int] = fastapi.Query(None)
 ) -> list[schemas.CampaignResponse]:
-    return db.all_campaigns(db_type, organization_id)
-
+    result = db.all_campaigns(db_type, organization_id)
+    return result
 
 @router.get("/{db_type}/applications", response_model=list[schemas.CampaignApplicationResponse])
 async def campaign_applications(

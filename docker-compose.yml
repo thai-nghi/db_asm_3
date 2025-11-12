@@ -9,6 +9,12 @@ services:
       - 9042:9042
     volumes:
       - scylladata:/var/lib/scylla
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     networks:
       main:
 
@@ -17,8 +23,12 @@ services:
     image: scylladb/scylla:latest
     volumes:
       - ./db_seed/scylla/create_schema.cql:/scylla_scripts/create_schema.cql
+      - ./db_seed/scylla/seed_data.cql:/scylla_scripts/seed_data.cql
       - ./db_seed/scylla/init.sh:/scylla_scripts/init.sh
     entrypoint: [ "bash", "/scylla_scripts/init.sh" ]
+    depends_on:
+      scylla:
+        condition: service_healthy
     networks:
       main:
 
@@ -35,6 +45,38 @@ services:
       - pgdata:/var/lib/postgresql
     networks:
       main:
+
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - 8000:80
+    depends_on:
+      postgres:
+        condition: service_started
+      scylla:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://asm3:password@postgres:5432/asm3_db
+      - SCYLLA_URL=scylla
+    volumes:
+      - duckdbdata:/app/data
+    networks:
+      main:
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - 5173:5173
+    depends_on:
+      - backend
+    networks:
+      main:
   
 networks:
   main:
@@ -44,4 +86,6 @@ volumes:
   pgdata:
     driver: local
   scylladata:
+    driver: local
+  duckdbdata:
     driver: local

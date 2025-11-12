@@ -54,7 +54,7 @@
         />
 
         <!-- Applications Tab -->
-        <input type="radio" name="db_tabs" class="tab" aria-label="📋 Applications" />
+        <input type="radio" name="db_tabs" class="tab" aria-label="📋 Applications" v-on:click="onApplicationSelected"/>
         <ApplicationsTable
           :campaigns="campaigns || []"
           :users="users || []"
@@ -88,7 +88,6 @@ const selectedOrganizationId = ref<number | null>(null)
 // Watch for database changes and invalidate all queries
 watch(selectedDatabase, async (newDb, oldDb) => {
   if (newDb !== oldDb) {
-    console.log(`Database changed from ${oldDb} to ${newDb}, invalidating all queries`)
     await queryClient.invalidateQueries()
   }
 })
@@ -118,6 +117,10 @@ const handleDeleteApplication = (application: Application) => {
 // Organization filter handler for campaigns
 const handleUpdateOrganizationFilter = (organizationId: number | null) => {
   selectedOrganizationId.value = organizationId
+}
+
+function onApplicationSelected(){
+  selectedOrganizationId.value = null;
 }
 </script>
 

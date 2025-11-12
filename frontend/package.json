@@ -12,6 +12,7 @@
     "@tailwindcss/vite": "^4.1.17",
     "@tanstack/vue-query": "^5.90.7",
     "daisyui": "^5.4.7",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^4.1.17",
     "vue": "^3.5.22",
     "vue-material-design-icons": "^5.3.1",

@@ -577,8 +577,12 @@ class ScyllaConnector:
             
             # Create new requirements
             for idx, requirement in enumerate(campaign_data.requirements):
-                req_id = int(time.time() * 1000) + idx  # Generate unique ID
+                current_id_result = list(self.session.execute(self.select_req_sequence_stmt, [0]))
+                if not current_id_result:
+                    raise ValueError("Failed to retrieve current requirements ID")
+                req_id = current_id_result[0][0] + 1
                 self.session.execute(self.insert_requirement_stmt, [req_id, campaign_id, requirement.media_type.value, requirement.count])
+                self.session.execute(self.update_req_sequence_stmt, [req_id, 0])
         
         # Return updated campaign with requirements
         campaign_result = list(self.session.execute(self.select_campaign_by_id_stmt, [campaign_id]))

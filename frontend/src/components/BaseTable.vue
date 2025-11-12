@@ -124,7 +124,7 @@ const props = defineProps({
   },
   itemsPerPage: {
     type: Number,
-    default: 5,
+    default: 15,
   },
 })
 

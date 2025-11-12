@@ -2,7 +2,6 @@ from app.settings import settings
 from app.db import models
 
 from sqlmodel import create_engine, SQLModel, Session, text
-import os
 from pathlib import Path
 from sqlalchemy.pool import NullPool
 
@@ -27,8 +26,8 @@ def init_database():
             print("DuckDB database not initialized, proceeding with setup")
     
     # Get the path to the duck_init.sql file
-    current_dir = Path(__file__).parent.parent  # Go up to app directory
-    sql_file_path = current_dir / "duck_init.sql"
+    current_dir = Path(__file__).parent  # Go up to app directory
+    sql_file_path = current_dir / "seed/duck_seed_data.sql"
     
     if not sql_file_path.exists():
         raise FileNotFoundError(f"SQL initialization file not found: {sql_file_path}")

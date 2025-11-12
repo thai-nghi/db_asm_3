@@ -65,7 +65,7 @@ export function useApplicationsQuery(
     enabled: MaybeRef<boolean> = true
 ) {
     return useQuery({
-        queryKey: ["applications", dbType],
+        queryKey: ["applications", dbType, campaignId, userId],
         queryFn: async () => {
             return api.getApplications(dbType.value, campaignId?.value || null, userId?.value || null);
         },
