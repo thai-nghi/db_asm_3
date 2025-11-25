@@ -30,18 +30,18 @@ def init_database():
 
     SQLModel.metadata.create_all(engine)
 
-    if not sql_file_path.exists():
-        raise FileNotFoundError(f"SQL initialization file not found: {sql_file_path}")
+    # if not sql_file_path.exists():
+    #     raise FileNotFoundError(f"SQL initialization file not found: {sql_file_path}")
 
-    print("Initializing Postgres database...")
+    # print("Initializing Postgres database...")
     
-    # Read and execute the SQL file
-    with open(sql_file_path, 'r') as file:
-        sql_content = file.read()
+    # # Read and execute the SQL file
+    # with open(sql_file_path, 'r') as file:
+    #     sql_content = file.read()
     
-    with Session(engine) as session:
-        session.exec(text(sql_content))
-        session.commit()
+    # with Session(engine) as session:
+    #     session.exec(text(sql_content))
+    #     session.commit()
 
     print("Postgres database initialization completed")
 

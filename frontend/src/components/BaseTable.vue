@@ -24,7 +24,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in paginatedData" :key="item.id">
+          <tr 
+            v-for="item in paginatedData" 
+            :key="item.id" 
+            class="cursor-pointer hover:bg-base-200 transition-colors"
+            @click="$emit('row-click', item)"
+          >
             <td v-for="column in columns" :key="column.key">
               <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
                 <span v-if="column.type === 'badge'" class="badge badge-outline" :class="column.badgeClass || 'badge-primary'">
@@ -131,6 +136,7 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: 'add'): void
   (e: 'edit', item: any): void
+  (e: 'row-click', item: any): void
 }>()
 
 // Pagination state

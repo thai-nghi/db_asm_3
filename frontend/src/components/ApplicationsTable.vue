@@ -162,7 +162,7 @@ import BaseTable from './BaseTable.vue'
 import FileDocumentIcon from 'vue-material-design-icons/FileDocument.vue'
 import { useApplicationsQuery } from '@/hooks/queries'
 import { useCreateApplicationMutation, useUpdateApplicationMutation } from '@/hooks/mutations'
-import type { Application, CampaignData, User, DatabaseType } from '../types'
+import type { Application, CampaignData, User } from '../types'
 import type { ApplicationStatus } from '@/api'
 
 const props = defineProps({
@@ -174,37 +174,32 @@ const props = defineProps({
     type: Array as PropType<User[]>,
     required: true,
   },
-  selectedDatabase: {
-    type: String as PropType<DatabaseType>,
-    required: true,
-  },
 })
 
 const emit = defineEmits<{
   (e: 'delete', application: Application): void
 }>()
 
-// Database type reactive ref
-const dbTypeRef = ref(props.selectedDatabase)
-
-// Watch for database changes
-watch(() => props.selectedDatabase, (newDb) => {
-  dbTypeRef.value = newDb
-})
-
 // Filter state
 const selectedCampaignId = ref<number | null>(null)
 const selectedUserId = ref<number | null>(null)
 
-// Query for applications with backend filtering
-const { data: applications } = useApplicationsQuery(
-  dbTypeRef,
+const selectedOrganizerId = computed(() => {
+  if (selectedCampaignId.value) {
+    return props.campaigns.find(camp => camp.id === selectedCampaignId.value)?.organizer_id
+  }
+  return null
+})
+
+
+// Query applications
+const { data: applicationsResult } = useApplicationsQuery(
+  selectedOrganizerId, // organizerId - optional for listing all if backend supports it, or we might need to filter
   selectedCampaignId,
   selectedUserId
 )
 
-// Computed property to ensure we always have an array
-const applicationData = computed(() => applications.value || [])
+const applicationData = computed(() => applicationsResult.value || [])
 
 // Modal refs and state
 const applicationModal = ref<HTMLDialogElement>()
@@ -219,13 +214,14 @@ const formData = reactive({
 })
 
 // Mutations
-const createApplicationMutation = useCreateApplicationMutation(dbTypeRef)
-const updateApplicationMutation = useUpdateApplicationMutation(dbTypeRef)
+const createApplicationMutation = useCreateApplicationMutation()
+const updateApplicationMutation = useUpdateApplicationMutation()
 
 // Computed properties
 const isSubmitting = computed(() => 
   createApplicationMutation.isPending.value || updateApplicationMutation.isPending.value
 )
+
 
 const columns = [
   { key: 'id', label: 'ID', type: 'badge' as const, badgeClass: 'badge-neutral' },
@@ -288,6 +284,14 @@ const handleSubmit = async () => {
   }
 
   try {
+    // Get the organizer ID from the selected campaign
+    const selectedCampaign = props.campaigns.find(c => c.id === formData.campaign_id)
+    if (!selectedCampaign) {
+      console.error('Selected campaign not found')
+      return
+    }
+    const organizerId = selectedCampaign.organizer_id
+
     if (isEditing.value && editingApplication.value) {
       // Update existing application
       const updateData: any = {}
@@ -296,15 +300,19 @@ const handleSubmit = async () => {
       if (formData.status) updateData.status = formData.status
 
       await updateApplicationMutation.mutateAsync({
+        organizerId: organizerId,
         applicationId: editingApplication.value.id,
         applicationData: updateData,
       })
     } else {
       // Create new application
       await createApplicationMutation.mutateAsync({
-        campaign_id: formData.campaign_id,
-        user_id: formData.user_id,
-        status: formData.status as ApplicationStatus,
+        organizerId: organizerId,
+        applicationData: {
+          campaign_id: formData.campaign_id,
+          user_id: formData.user_id,
+          status: formData.status as ApplicationStatus,
+        }
       })
     }
     

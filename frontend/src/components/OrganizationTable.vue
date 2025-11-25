@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, type PropType } from 'vue'
+import { ref, reactive, computed, type PropType } from 'vue'
 import BaseTable from './BaseTable.vue'
 import OfficeBuildingIcon from 'vue-material-design-icons/OfficeBuilding.vue'
 import { useCreateOrganizationMutation, useUpdateOrganizationMutation } from '@/hooks/mutations'
@@ -77,23 +77,11 @@ const props = defineProps({
     type: Array as PropType<Organization[]>,
     required: true,
   },
-  selectedDatabase: {
-    type: String as PropType<DatabaseType>,
-    required: true,
-  },
 })
 
 const emit = defineEmits<{
   (e: 'delete', organization: Organization): void
 }>()
-
-// Database type reactive ref
-const dbTypeRef = ref(props.selectedDatabase)
-
-// Watch for database changes
-watch(() => props.selectedDatabase, (newDb) => {
-  dbTypeRef.value = newDb
-})
 
 // Modal refs and state
 const organizationModal = ref<HTMLDialogElement>()
@@ -105,8 +93,11 @@ const formData = reactive({
   name: '',
 })
 
+// Database type ref for update mutation (organizations use postgres by default)
+const dbTypeRef = ref<DatabaseType>('postgres')
+
 // Mutations
-const createOrganizationMutation = useCreateOrganizationMutation(dbTypeRef)
+const createOrganizationMutation = useCreateOrganizationMutation()
 const updateOrganizationMutation = useUpdateOrganizationMutation(dbTypeRef)
 
 // Computed properties

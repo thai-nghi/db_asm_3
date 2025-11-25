@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+from uuid import UUID
 from app.db.models import MediaType, ApplicationStatus
 
 class DatabaseType(str, Enum):
@@ -24,6 +25,10 @@ class OrganizationResponse(BaseModel):
     name: str
 
 
+class CountryResponse(BaseModel):
+    id: int
+    code: str
+
 
 class CampaignResponse(BaseModel):
     id: int
@@ -37,6 +42,26 @@ class CampaignApplicationResponse(BaseModel):
     campaign_id: int
     user_id: int
     status: ApplicationStatus
+
+
+# New schemas for account, publication, and user_account
+class AccountResponse(BaseModel):
+    id: UUID
+    username: str
+    followers: int
+
+
+class PublicationResponse(BaseModel):
+    id: UUID
+    account_id: UUID
+    type: str
+    insights: Dict[str, Any]  # JSON data
+
+
+class UserAccountResponse(BaseModel):
+    id: UUID
+    user_id: int
+    account_id: UUID
 
 
 # Create schemas
@@ -62,6 +87,22 @@ class CampaignApplicationCreate(BaseModel):
     status: ApplicationStatus
 
 
+class AccountCreate(BaseModel):
+    username: str
+    followers: int
+
+
+class PublicationCreate(BaseModel):
+    account_id: UUID
+    type: str
+    insights: Dict[str, Any]  # JSON data
+
+
+class UserAccountCreate(BaseModel):
+    user_id: int
+    account_id: UUID
+
+
 # Update schemas
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -83,6 +124,22 @@ class CampaignApplicationUpdate(BaseModel):
     campaign_id: Optional[int] = None
     user_id: Optional[int] = None
     status: Optional[ApplicationStatus] = None
+
+
+class AccountUpdate(BaseModel):
+    username: Optional[str] = None
+    followers: Optional[int] = None
+
+
+class PublicationUpdate(BaseModel):
+    account_id: Optional[UUID] = None
+    type: Optional[str] = None
+    insights: Optional[Dict[str, Any]] = None
+
+
+class UserAccountUpdate(BaseModel):
+    user_id: Optional[int] = None
+    account_id: Optional[UUID] = None
 
 
 # Input schemas for endpoints

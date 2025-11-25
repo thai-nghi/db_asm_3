@@ -37,13 +37,30 @@ CREATE TABLE IF NOT EXISTS campaign_requirements (
     media_type text -- 'photo' or 'video'
 );
 
--- Create campaign_application table
--- Note: ScyllaDB doesn't have ENUMs, so we use text with validation in application layer
 CREATE TABLE IF NOT EXISTS campaign_application (
     id int PRIMARY KEY,
     campaign_id int,
     user_id int,
     status text -- 'pending', 'accept', or 'declined'
+);
+
+CREATE TABLE IF NOT EXISTS account (
+    id uuid PRIMARY KEY,
+    username text,
+    followers int
+);
+
+CREATE TABLE IF NOT EXISTS publication (
+    id uuid PRIMARY KEY,
+    account_id uuid,
+    type text,
+    insights text -- json as text
+);
+
+CREATE TABLE IF NOT EXISTS user_account (
+    id uuid PRIMARY KEY,
+    user_id int,
+    account_id uuid
 );
 
 -- Create secondary indexes for foreign key lookups
@@ -52,6 +69,9 @@ CREATE INDEX IF NOT EXISTS ON campaign (organizer_id);
 CREATE INDEX IF NOT EXISTS ON campaign_requirements (campaign_id);
 CREATE INDEX IF NOT EXISTS ON campaign_application (campaign_id);
 CREATE INDEX IF NOT EXISTS ON campaign_application (user_id);
+CREATE INDEX IF NOT EXISTS ON publication (account_id);
+CREATE INDEX IF NOT EXISTS ON user_account (user_id);
+CREATE INDEX IF NOT EXISTS ON user_account (account_id);
 
 -- Create materialized views for efficient querying patterns
 -- View for campaigns by organizer
@@ -83,6 +103,25 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS requirements_by_media_type AS
     SELECT * FROM campaign_requirements
     WHERE media_type IS NOT NULL AND id IS NOT NULL
     PRIMARY KEY (media_type, id);
+
+-- New materialized views for account, publication, and user_account
+-- View for publications by account
+CREATE MATERIALIZED VIEW IF NOT EXISTS publications_by_account AS
+    SELECT * FROM publication
+    WHERE account_id IS NOT NULL AND id IS NOT NULL
+    PRIMARY KEY (account_id, id);
+
+-- View for user_accounts by user_id
+CREATE MATERIALIZED VIEW IF NOT EXISTS user_accounts_by_user AS
+    SELECT * FROM user_account
+    WHERE user_id IS NOT NULL AND id IS NOT NULL
+    PRIMARY KEY (user_id, id);
+
+-- View for user_accounts by account_id
+CREATE MATERIALIZED VIEW IF NOT EXISTS user_accounts_by_account AS
+    SELECT * FROM user_account
+    WHERE account_id IS NOT NULL AND id IS NOT NULL
+    PRIMARY KEY (account_id, id);
 
 -- Create support key table
 CREATE TABLE IF NOT EXISTS sequence_id (

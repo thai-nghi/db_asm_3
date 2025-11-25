@@ -61,6 +61,10 @@ const emit = defineEmits<{
 - **Start Frontend**: `cd frontend && npm run dev`
 - **Build**: `npm run build` (includes TypeScript compilation)
 
+### Testing & Hot Reload
+- **NO MANUAL TERMINAL COMMANDS**: Hot reload is active. Do not run `npm run dev` or `uvicorn` manually.
+- **Workflow**: Make code changes -> Wait for hot reload -> Verify in browser (if applicable).
+
 ### Database Setup
 - **Docker**: `docker-compose up -d` (Postgres + ScyllaDB)
 - **Seeds**: SQL files in `db_seed/` for schema initialization

@@ -19,9 +19,6 @@ class User(SQLModel, table=True):
     email: str
     password: str
 
-    # Relationship to applications
-    applications: list["CampaignApplication"] = Relationship(back_populates="user")
-
 
 class Organization(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
@@ -59,9 +56,19 @@ class CampaignApplication(SQLModel, table=True):
     
     id: int = Field(default=None, primary_key=True)
     campaign_id: int = Field(foreign_key="campaign.id")
-    user_id: int = Field(foreign_key="user.id")
+    user_id: int
     status: ApplicationStatus
 
     # Relationships
     campaign: Campaign = Relationship(back_populates="applications")
-    user: User = Relationship(back_populates="applications")
+
+class Country(SQLModel, table=True):
+    id: int = Field(default=None, primary_key=True)
+    code: str
+
+class UserCountry(SQLModel, table=True):
+    __tablename__ = "user_country"
+    
+    id: int = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    country_id: int = Field(foreign_key="country.id")

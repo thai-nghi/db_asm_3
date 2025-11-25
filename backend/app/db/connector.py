@@ -1,9 +1,8 @@
 from app import schemas
 from app.db.postgres import engine as postgres_engine
-from app.db.duck import engine as duckdb_engine
 from app.db import models
 from sqlmodel import Session, select
-from typing import List, Union
+from typing import List
 from app.db.scylla import session as scylla_session
 
 
@@ -23,7 +22,13 @@ class SQLConnector:
             results = session.exec(statement)
             return [schemas.OrganizationResponse.model_validate(org.model_dump()) for org in results]
 
-    def campaign_applications(self, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
+    def all_countries(self) -> List[schemas.CountryResponse]:
+        with Session(self.engine) as session:
+            statement = select(models.Country).order_by(models.Country.id)
+            results = session.exec(statement)
+            return [schemas.CountryResponse.model_validate(country.model_dump()) for country in results]
+
+    def all_applications(self, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
         with Session(self.engine) as session:
             statement = select(models.CampaignApplication)
             
@@ -82,27 +87,27 @@ class SQLConnector:
                 return schemas.CampaignApplicationResponse.model_validate(application.model_dump())
             return None
 
-    def create_user(self, user_data: schemas.UserCreate) -> schemas.UserResponse:
+    def create_user(self, id: int, user_data: schemas.UserCreate) -> schemas.UserResponse:
         with Session(self.engine) as session:
-            user = models.User(**user_data.model_dump())
+            user = models.User(id=id, **user_data.model_dump())
             session.add(user)
             session.commit()
             session.refresh(user)
             return schemas.UserResponse.model_validate(user.model_dump())
 
-    def create_organization(self, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse:
+    def create_organization(self, id: int, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse:
         with Session(self.engine) as session:
-            organization = models.Organization(**organization_data.model_dump())
+            organization = models.Organization(id=id, **organization_data.model_dump())
             session.add(organization)
             session.commit()
             session.refresh(organization)
             return schemas.OrganizationResponse.model_validate(organization.model_dump())
 
-    def create_campaign(self, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse:
+    def create_campaign(self, id: int, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse:
         with Session(self.engine) as session:
             # Create campaign
             campaign_dict = {"organizer_id": campaign_data.organizer_id, "name": campaign_data.name}
-            campaign = models.Campaign(**campaign_dict)
+            campaign = models.Campaign(id=id, **campaign_dict)
             session.add(campaign)
             session.commit()
             session.refresh(campaign)
@@ -178,14 +183,42 @@ class SQLConnector:
                 requirements=[schemas.CampaignRequirement(**req.model_dump()) for req in requirements]
             )
 
-    def create_application(self, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse:
+    def create_application(self, id: int, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse:
         with Session(self.engine) as session:
-            application = models.CampaignApplication(**application_data.model_dump())
+            application = models.CampaignApplication(id=id, **application_data.model_dump())
             session.add(application)
             session.commit()
             session.refresh(application)
             return schemas.CampaignApplicationResponse.model_validate(application.model_dump())
         
+    def get_user_country(self, user_id: int) -> schemas.CountryResponse:
+        with Session(self.engine) as session:
+
+            statement = select(models.UserCountry).join(models.Country).where(models.UserCountry.user_id == user_id)
+            country = session.exec(statement).first()
+            
+            return schemas.CountryResponse.model_validate(country.model_dump()) if country else None
+
+    def set_user_country(self, user_id: int, country_id: int) -> schemas.CountryResponse:
+        with Session(self.engine) as session:
+
+            user_country = session.exec(select(models.UserCountry).where(models.UserCountry.user_id == user_id)).first()
+
+            if user_country is None:
+                user_country = models.UserCountry(user_id=user_id, country_id=country_id)
+                session.add(user_country)
+            else:
+                user_country.country_id = country_id
+
+            session.add(user_country)
+            session.commit()
+            session.refresh(user_country)
+
+            # Get the updated country information
+            statement = select(models.UserCountry).join(models.Country).where(models.UserCountry.user_id == user_id)
+            updated_country = session.exec(statement).first()
+
+            return schemas.CountryResponse.model_validate(updated_country.model_dump()) if updated_country else None
     
 
 class ScyllaConnector:
@@ -223,6 +256,21 @@ class ScyllaConnector:
         self.select_apps_by_user_stmt = self.session.prepare("SELECT * FROM applications_by_user WHERE user_id = ?")
         # Note: Cannot create materialized views with both campaign_id and user_id due to ScyllaDB limitations
         # (can only include one non-primary key column in materialized view primary key)
+        
+        # Account queries
+        self.select_account_by_id_stmt = self.session.prepare("SELECT * FROM account WHERE id = ?")
+        self.insert_account_stmt = self.session.prepare("INSERT INTO account (id, username, followers) VALUES (?, ?, ?)")
+        
+        # Publication queries
+        self.select_publication_by_id_stmt = self.session.prepare("SELECT * FROM publication WHERE id = ?")
+        self.insert_publication_stmt = self.session.prepare("INSERT INTO publication (id, account_id, type, insights) VALUES (?, ?, ?, ?)")
+        self.select_publications_by_account_stmt = self.session.prepare("SELECT * FROM publications_by_account WHERE account_id = ?")
+        
+        # User Account queries
+        self.select_user_account_by_id_stmt = self.session.prepare("SELECT * FROM user_account WHERE id = ?")
+        self.insert_user_account_stmt = self.session.prepare("INSERT INTO user_account (id, user_id, account_id) VALUES (?, ?, ?)")
+        self.select_user_accounts_by_user_stmt = self.session.prepare("SELECT * FROM user_accounts_by_user WHERE user_id = ?")
+        self.select_user_accounts_by_account_stmt = self.session.prepare("SELECT * FROM user_accounts_by_account WHERE account_id = ?")
         
         # Sequence queries
         self.select_user_sequence_stmt = self.session.prepare("SELECT user_sequence FROM sequence_id WHERE id = ?")
@@ -289,7 +337,7 @@ class ScyllaConnector:
         campaigns.sort(key=lambda c: c.id)
         return campaigns
 
-    def campaign_applications(self, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
+    def all_applications(self, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
         """Get all applications with optional filtering by campaign_id and/or user_id"""
         
         # Build query with proper WHERE clause structure
@@ -463,68 +511,42 @@ class ScyllaConnector:
             status=row.status
         )
 
-    def create_user(self, user_data: schemas.UserCreate) -> schemas.UserResponse | None:
+    def create_user(self, id: int, user_data: schemas.UserCreate) -> schemas.UserResponse | None:
         """Create a user in ScyllaDB"""
 
-        # Fetch current user id
-        current_id_result = list(self.session.execute(self.select_user_sequence_stmt, [0]))
-        if not current_id_result:
-            raise ValueError("Failed to retrieve current user ID")
-        current_id = current_id_result[0]
-        new_user_id = current_id[0] + 1
 
         data = user_data.model_dump()
-        self.session.execute(self.insert_user_stmt, [new_user_id, data['username'], data['email'], data['password']])
+        self.session.execute(self.insert_user_stmt, [id, data['username'], data['email'], data['password']])
         
-        # Update saved id to new value
-        self.session.execute(self.update_user_sequence_stmt, [new_user_id, 0])
         
         # Return created user
-        result_rows = list(self.session.execute(self.select_user_by_id_stmt, [new_user_id]))
+        result_rows = list(self.session.execute(self.select_user_by_id_stmt, [id]))
         if not result_rows:
             return None
         row = result_rows[0]
 
         return schemas.UserResponse(id=row.id, username=row.username, email=row.email)
 
-    def create_organization(self, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse | None:
+    def create_organization(self, id: int, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse | None:
         """Create an organization in ScyllaDB"""
         
-        # Fetch current organization id
-        current_id_result = list(self.session.execute(self.select_org_sequence_stmt, [0]))
-        if not current_id_result:
-            raise ValueError("Failed to retrieve current organization ID")
-        current_id = current_id_result[0]
-        new_org_id = current_id[0] + 1
-        
         data = organization_data.model_dump()
-        self.session.execute(self.insert_org_stmt, [new_org_id, data['name']])
-        
-        # Update saved id to new value
-        self.session.execute(self.update_org_sequence_stmt, [new_org_id, 0])
+        self.session.execute(self.insert_org_stmt, [id, data['name']])
         
         # Return created organization
-        result_rows = list(self.session.execute(self.select_org_by_id_stmt, [new_org_id]))
+        result_rows = list(self.session.execute(self.select_org_by_id_stmt, [id]))
         if not result_rows:
             return None
         row = result_rows[0]
         return schemas.OrganizationResponse(id=row.id, name=row.name)
 
-    def create_campaign(self, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse | None:
+    def create_campaign(self, id: int, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse | None:
         """Create a campaign with requirements in ScyllaDB"""
         
-        # Fetch current campaign id
-        current_id_result = list(self.session.execute(self.select_campaign_sequence_stmt, [0]))
-        if not current_id_result:
-            raise ValueError("Failed to retrieve current campaign ID")
-        current_id = current_id_result[0]
-        new_campaign_id = current_id[0] + 1
         
         # Create campaign
-        self.session.execute(self.insert_campaign_stmt, [new_campaign_id, campaign_data.organizer_id, campaign_data.name])
+        self.session.execute(self.insert_campaign_stmt, [id, campaign_data.organizer_id, campaign_data.name])
         
-        # Update campaign sequence
-        self.session.execute(self.update_campaign_sequence_stmt, [new_campaign_id, 0])
         
         # Create requirements
         requirements_list = []
@@ -536,7 +558,7 @@ class ScyllaConnector:
             req_current_id = req_current_id_result[0]
             new_req_id = req_current_id[0] + 1
             
-            self.session.execute(self.insert_requirement_stmt, [new_req_id, new_campaign_id, requirement.media_type.value, requirement.count])
+            self.session.execute(self.insert_requirement_stmt, [new_req_id, id, requirement.media_type.value, requirement.count])
             
             # Update requirements sequence
             self.session.execute(self.update_req_sequence_stmt, [new_req_id, 0])
@@ -544,7 +566,7 @@ class ScyllaConnector:
             requirements_list.append(requirement)
         
         return schemas.CampaignResponse(
-            id=new_campaign_id,
+            id=id,
             organizer_id=campaign_data.organizer_id,
             name=campaign_data.name,
             requirements=requirements_list
@@ -607,24 +629,13 @@ class ScyllaConnector:
             requirements=requirements
         )
 
-    def create_application(self, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse | None:
+    def create_application(self, id: int, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse | None:
         """Create a campaign application in ScyllaDB"""
-        
-        # Fetch current application id
-        current_id_result = list(self.session.execute(self.select_app_sequence_stmt, [0]))
-        if not current_id_result:
-            raise ValueError("Failed to retrieve current application ID")
-        current_id = current_id_result[0]
-        new_app_id = current_id[0] + 1
-        
         data = application_data.model_dump()
-        self.session.execute(self.insert_app_stmt, [new_app_id, data['campaign_id'], data['user_id'], data['status']])
-        
-        # Update saved id to new value
-        self.session.execute(self.update_app_sequence_stmt, [new_app_id, 0])
+        self.session.execute(self.insert_app_stmt, [id, data['campaign_id'], data['user_id'], data['status']])
         
         # Return created application
-        result_rows = list(self.session.execute(self.select_app_by_id_stmt, [new_app_id]))
+        result_rows = list(self.session.execute(self.select_app_by_id_stmt, [id]))
         if not result_rows:
             return None
         row = result_rows[0]
@@ -635,120 +646,514 @@ class ScyllaConnector:
             status=row.status
         )
 
+    # Account functions
+    def create_account(self, account_data: schemas.AccountCreate) -> schemas.AccountResponse | None:
+        """Create an account in ScyllaDB"""
+        import uuid
+        
+        new_account_id = uuid.uuid4()
+        
+        data = account_data.model_dump()
+        self.session.execute(self.insert_account_stmt, [new_account_id, data['username'], data['followers']])
+        
+        # Return created account
+        result_rows = list(self.session.execute(self.select_account_by_id_stmt, [new_account_id]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        return schemas.AccountResponse(id=row.id, username=row.username, followers=row.followers)
+
+    def update_account(self, account_id: str, account_data: schemas.AccountUpdate) -> schemas.AccountResponse | None:
+        """Update an account in ScyllaDB"""
+        import uuid
+        
+        try:
+            account_uuid = uuid.UUID(account_id)
+        except ValueError:
+            return None
+            
+        update_dict = account_data.model_dump(exclude_unset=True)
+        if not update_dict:
+            return None
+        
+        # Build dynamic UPDATE query
+        set_clauses = []
+        values = []
+        for key, value in update_dict.items():
+            set_clauses.append(f"{key} = %s")
+            values.append(value)
+        
+        query = f"UPDATE account SET {', '.join(set_clauses)} WHERE id = %s"
+        values.append(account_uuid)
+        
+        self.session.execute(query, values)
+        
+        # Return updated account
+        result_rows = list(self.session.execute(self.select_account_by_id_stmt, [account_uuid]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        return schemas.AccountResponse(id=row.id, username=row.username, followers=row.followers)
+
+    # Publication functions
+    def all_publications(self, account_id: str | None = None) -> List[schemas.PublicationResponse]:
+        """Get all publications from ScyllaDB, optionally filtered by account_id"""
+        import json
+        import uuid
+        
+        if account_id:
+            try:
+                account_uuid = uuid.UUID(account_id)
+                rows = self.session.execute(self.select_publications_by_account_stmt, [account_uuid])
+            except ValueError:
+                return []
+        else:
+            query = "SELECT * FROM publication"
+            rows = self.session.execute(query)
+
+        publications = []
+        for row in rows:
+            try:
+                # Parse JSON insights
+                insights = json.loads(row.insights) if row.insights else {}
+            except json.JSONDecodeError:
+                insights = {}
+                
+            publications.append(schemas.PublicationResponse(
+                id=row.id,
+                account_id=row.account_id,
+                type=row.type,
+                insights=insights
+            ))
+
+        publications.sort(key=lambda p: str(p.id))
+        return publications
+
+    def create_publication(self, publication_data: schemas.PublicationCreate) -> schemas.PublicationResponse | None:
+        """Create a publication in ScyllaDB"""
+        import uuid
+        import json
+        
+        new_publication_id = uuid.uuid4()
+        
+        data = publication_data.model_dump()
+        insights_json = json.dumps(data['insights'])
+        
+        self.session.execute(self.insert_publication_stmt, [
+            new_publication_id, 
+            data['account_id'], 
+            data['type'], 
+            insights_json
+        ])
+        
+        # Return created publication
+        result_rows = list(self.session.execute(self.select_publication_by_id_stmt, [new_publication_id]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        
+        try:
+            insights = json.loads(row.insights) if row.insights else {}
+        except json.JSONDecodeError:
+            insights = {}
+            
+        return schemas.PublicationResponse(
+            id=row.id,
+            account_id=row.account_id,
+            type=row.type,
+            insights=insights
+        )
+
+    def update_publication(self, publication_id: str, publication_data: schemas.PublicationUpdate) -> schemas.PublicationResponse | None:
+        """Update a publication in ScyllaDB"""
+        import uuid
+        import json
+        
+        try:
+            publication_uuid = uuid.UUID(publication_id)
+        except ValueError:
+            return None
+            
+        update_dict = publication_data.model_dump(exclude_unset=True)
+        if not update_dict:
+            return None
+        
+        # Build dynamic UPDATE query
+        set_clauses = []
+        values = []
+        for key, value in update_dict.items():
+            if key == 'insights':
+                # Convert insights dict to JSON string
+                value = json.dumps(value)
+            set_clauses.append(f"{key} = %s")
+            values.append(value)
+        
+        query = f"UPDATE publication SET {', '.join(set_clauses)} WHERE id = %s"
+        values.append(publication_uuid)
+        
+        self.session.execute(query, values)
+        
+        # Return updated publication
+        result_rows = list(self.session.execute(self.select_publication_by_id_stmt, [publication_uuid]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        
+        try:
+            insights = json.loads(row.insights) if row.insights else {}
+        except json.JSONDecodeError:
+            insights = {}
+            
+        return schemas.PublicationResponse(
+            id=row.id,
+            account_id=row.account_id,
+            type=row.type,
+            insights=insights
+        )
+
+
+    # User Account functions
+    def all_user_accounts(self, user_id: int) -> List[schemas.UserAccountResponse]:
+        """Get all user accounts from ScyllaDB for a specific user"""
+        import uuid
+        
+        # Filter by user_id only
+        rows = self.session.execute(self.select_user_accounts_by_user_stmt, [user_id])
+        user_accounts = [schemas.UserAccountResponse(
+            id=row.id,
+            user_id=row.user_id,
+            account_id=row.account_id
+        ) for row in rows]
+
+        user_accounts.sort(key=lambda ua: str(ua.id))
+        return user_accounts
+
+    def create_user_account(self, user_account_data: schemas.UserAccountCreate) -> schemas.UserAccountResponse | None:
+        """Create a user account relationship in ScyllaDB"""
+        import uuid
+        
+        new_user_account_id = uuid.uuid4()
+        
+        data = user_account_data.model_dump()
+        self.session.execute(self.insert_user_account_stmt, [
+            new_user_account_id, 
+            data['user_id'], 
+            data['account_id']
+        ])
+        
+        # Return created user account
+        result_rows = list(self.session.execute(self.select_user_account_by_id_stmt, [new_user_account_id]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        return schemas.UserAccountResponse(id=row.id, user_id=row.user_id, account_id=row.account_id)
+
+    def update_user_account(self, user_account_id: str, user_account_data: schemas.UserAccountUpdate) -> schemas.UserAccountResponse | None:
+        """Update a user account relationship in ScyllaDB"""
+        import uuid
+        
+        try:
+            user_account_uuid = uuid.UUID(user_account_id)
+        except ValueError:
+            return None
+            
+        update_dict = user_account_data.model_dump(exclude_unset=True)
+        if not update_dict:
+            return None
+        
+        # Build dynamic UPDATE query
+        set_clauses = []
+        values = []
+        for key, value in update_dict.items():
+            set_clauses.append(f"{key} = %s")
+            values.append(value)
+        
+        query = f"UPDATE user_account SET {', '.join(set_clauses)} WHERE id = %s"
+        values.append(user_account_uuid)
+        
+        self.session.execute(query, values)
+        
+        # Return updated user account
+        result_rows = list(self.session.execute(self.select_user_account_by_id_stmt, [user_account_uuid]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        return schemas.UserAccountResponse(id=row.id, user_id=row.user_id, account_id=row.account_id)
+
+    def get_user_account(self, user_account_id: str) -> schemas.UserAccountResponse | None:
+        """Get a single user account relationship by ID"""
+        import uuid
+        
+        try:
+            user_account_uuid = uuid.UUID(user_account_id)
+        except ValueError:
+            return None
+            
+        result_rows = list(self.session.execute(self.select_user_account_by_id_stmt, [user_account_uuid]))
+        if not result_rows:
+            return None
+        row = result_rows[0]
+        return schemas.UserAccountResponse(id=row.id, user_id=row.user_id, account_id=row.account_id)
+
+    def current_user_id(self) -> int:
+        """Get the current highest user ID in ScyllaDB"""
+        current_id_result = list(self.session.execute(self.select_user_sequence_stmt, [0]))
+        if not current_id_result:
+            raise ValueError("Failed to retrieve current user ID")
+        current_id = current_id_result[0]
+        return current_id[0]
+    
+    def current_organization_id(self) -> int:
+        """Get the current highest organization ID in ScyllaDB"""
+        current_id_result = list(self.session.execute(self.select_org_sequence_stmt, [0]))
+        if not current_id_result:
+            raise ValueError("Failed to retrieve current organization ID")
+        current_id = current_id_result[0]
+        return current_id[0]
+    
+    def current_campaign_id(self) -> int:
+        """Get the current highest campaign ID in ScyllaDB"""
+        current_id_result = list(self.session.execute(self.select_campaign_sequence_stmt, [0]))
+        if not current_id_result:
+            raise ValueError("Failed to retrieve current campaign ID")
+        current_id = current_id_result[0]
+        return current_id[0]
+    
+    def current_application_id(self) -> int:
+        """Get the current highest application ID in ScyllaDB"""
+        current_id_result = list(self.session.execute(self.select_app_sequence_stmt, [0]))
+        if not current_id_result:
+            raise ValueError("Failed to retrieve current application ID")
+        current_id = current_id_result[0]
+        return current_id[0]
+    
+    def update_user_sequence(self, new_id: int) -> None:
+        """Update the user ID sequence in ScyllaDB"""
+        self.session.execute(self.update_user_sequence_stmt, [new_id, 0])
+    
+    def update_organization_sequence(self, new_id: int) -> None:
+        """Update the organization ID sequence in ScyllaDB"""
+        self.session.execute(self.update_org_sequence_stmt, [new_id, 0])
+    
+    def update_campaign_sequence(self, new_id: int) -> None:
+        """Update the campaign ID sequence in ScyllaDB"""
+        self.session.execute(self.update_campaign_sequence_stmt, [new_id, 0])
+    
+    def update_application_sequence(self, new_id: int) -> None:
+        """Update the application ID sequence in ScyllaDB"""
+        self.session.execute(self.update_app_sequence_stmt, [new_id, 0])
+
+
+def id_to_db(entity_id: int) -> str:
+    if entity_id % 2 == 0:
+        return "scylla"
+    return "postgres"
+
+def combine_list(list1: List, list2: List) -> List:
+    #combine sorted lists into one sorted list
+    combined = []
+    i, j = 0, 0
+    while i < len(list1) and j < len(list2):
+        if list1[i].id < list2[j].id:
+            combined.append(list1[i])
+            i += 1
+        else:
+            combined.append(list2[j])
+            j += 1
+    while i < len(list1):
+        combined.append(list1[i])
+        i += 1
+    while j < len(list2):
+        combined.append(list2[j])
+        j += 1
+    return combined
+
 
 class Connector:
     def __init__(self):
         self.postgres_connector = SQLConnector(postgres_engine)
-        self.duck_connector = SQLConnector(duckdb_engine)
         self.scylla_connector = ScyllaConnector(scylla_session)
 
-    def all_users(self, db_type: str) -> List[schemas.UserResponse]:
-        if db_type == "postgres":
-            return self.postgres_connector.all_users()
-        if db_type == "duckdb":
-            return self.duck_connector.all_users()
-        if db_type == "scylla":
-            return self.scylla_connector.all_users()
-        return []
+    def all_users(self) -> List[schemas.UserResponse]:
+        postgres_users = self.postgres_connector.all_users()
+        scylla_users = self.scylla_connector.all_users()
+        return combine_list(postgres_users, scylla_users)
+    
+    def all_organizations(self) -> List[schemas.OrganizationResponse]:
+        postgres_organizations = self.postgres_connector.all_organizations()
+        scylla_organizations = self.scylla_connector.all_organizations()
+        return combine_list(postgres_organizations, scylla_organizations)
 
-    def all_organizations(self, db_type: str) -> List[schemas.OrganizationResponse]:
-        if db_type == "postgres":
-            return self.postgres_connector.all_organizations()
-        if db_type == "duckdb":
-            return self.duck_connector.all_organizations()
-        if db_type == "scylla":
-            return self.scylla_connector.all_organizations()
-        return []
+    def all_countries(self) -> List[schemas.CountryResponse]:
+        return self.postgres_connector.all_countries()
 
-    def all_campaigns(self, db_type: str, organization_id: int | None = None) -> List[schemas.CampaignResponse]:
-        if db_type == "postgres":
-            return self.postgres_connector.all_campaigns(organization_id)
-        if db_type == "duckdb":
-            return self.duck_connector.all_campaigns(organization_id)
-        if db_type == "scylla":
-            return self.scylla_connector.all_campaigns(organization_id)
-        return []
+    def all_campaigns(self, organization_id: int | None = None) -> List[schemas.CampaignResponse]:
+        if organization_id:
+            db = id_to_db(organization_id) if organization_id else "postgres"
 
-    def campaign_applications(self, db_type: str, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
-        if db_type == "postgres":
-            return self.postgres_connector.campaign_applications(campaign_id, user_id)
-        if db_type == "duckdb":
-            return self.duck_connector.campaign_applications(campaign_id, user_id)
-        if db_type == "scylla":
-            return self.scylla_connector.campaign_applications(campaign_id, user_id)
-        return []
+            print(f"target_db: {db}")
 
-    def update_user(self, db_type: str, user_id: int, user_data: schemas.UserUpdate) -> schemas.UserResponse | None:
-        if db_type == "postgres":
+            if db == "postgres":
+                return self.postgres_connector.all_campaigns(organization_id)
+            if db == "scylla":
+                return self.scylla_connector.all_campaigns(organization_id)
+            
+            return []
+
+        postgres_campaigns = self.postgres_connector.all_campaigns()
+        scylla_campaigns = self.scylla_connector.all_campaigns()
+        return combine_list(postgres_campaigns, scylla_campaigns)
+
+    def all_applications(self, organizer_id: int | None = None, campaign_id: int | None = None, user_id: int | None = None) -> List[schemas.CampaignApplicationResponse]:
+        if campaign_id:
+            if not organizer_id:
+                return []
+                
+            db = id_to_db(organizer_id)
+
+            if db == "postgres":
+                return self.postgres_connector.all_applications(campaign_id, user_id)
+            if db == "scylla":
+                return self.scylla_connector.all_applications(campaign_id, user_id)
+
+        postgres_applications = self.postgres_connector.all_applications(user_id)
+        scylla_applications = self.scylla_connector.all_applications(user_id)
+        return combine_list(postgres_applications, scylla_applications)
+
+    def update_user(self, user_id: int, user_data: schemas.UserUpdate) -> schemas.UserResponse | None:
+        db = id_to_db(user_id)
+
+        if db == "postgres":
             return self.postgres_connector.update_user(user_id, user_data)
-        if db_type == "duckdb":
-            return self.duck_connector.update_user(user_id, user_data)
-        if db_type == "scylla":
+        if db == "scylla":
             return self.scylla_connector.update_user(user_id, user_data)
         return None
 
-    def update_organization(self, db_type: str, organization_id: int, organization_data: schemas.OrganizationUpdate) -> schemas.OrganizationResponse | None:
-        if db_type == "postgres":
+    def update_organization(self, organization_id: int, organization_data: schemas.OrganizationUpdate) -> schemas.OrganizationResponse | None:
+        db = id_to_db(organization_id)
+
+        if db == "postgres":
             return self.postgres_connector.update_organization(organization_id, organization_data)
-        if db_type == "duckdb":
-            return self.duck_connector.update_organization(organization_id, organization_data)
-        if db_type == "scylla":
+        if db == "scylla":
             return self.scylla_connector.update_organization(organization_id, organization_data)
         return None
 
-    def update_campaign(self, db_type: str, campaign_id: int, campaign_data: schemas.CampaignUpdate) -> schemas.CampaignResponse | None:
-        if db_type == "postgres":
+    def update_campaign(self, campaign_id: int, campaign_data: schemas.CampaignUpdate) -> schemas.CampaignResponse | None:
+        db = id_to_db(campaign_id)
+
+        if db == "postgres":
             return self.postgres_connector.update_campaign(campaign_id, campaign_data)
-        if db_type == "duckdb":
-            return self.duck_connector.update_campaign(campaign_id, campaign_data)
-        if db_type == "scylla":
+        if db == "scylla":
             return self.scylla_connector.update_campaign(campaign_id, campaign_data)
         return None
 
-    def update_application(self, db_type: str, application_id: int, application_data: schemas.CampaignApplicationUpdate) -> schemas.CampaignApplicationResponse | None:
-        if db_type == "postgres":
+    def update_application(self, organizer_id: int, application_id: int, application_data: schemas.CampaignApplicationUpdate) -> schemas.CampaignApplicationResponse | None:
+        db = id_to_db(organizer_id)
+
+        if db == "postgres":
             return self.postgres_connector.update_application(application_id, application_data)
-        if db_type == "duckdb":
-            return self.duck_connector.update_application(application_id, application_data)
-        if db_type == "scylla":
+        if db == "scylla":
             return self.scylla_connector.update_application(application_id, application_data)
         return None
 
-    def create_user(self, db_type: str, user_data: schemas.UserCreate) -> schemas.UserResponse | None:
-        if db_type == "postgres":
-            return self.postgres_connector.create_user(user_data)
-        if db_type == "duckdb":
-            return self.duck_connector.create_user(user_data)
-        if db_type == "scylla":
-            return self.scylla_connector.create_user(user_data)
+    def create_user(self, user_data: schemas.UserCreate) -> schemas.UserResponse | None:
+        current_id = self.scylla_connector.current_user_id()
+        next_id = current_id + 1
+        self.scylla_connector.update_user_sequence(next_id)
+
+        db = id_to_db(next_id)
+
+        if db == "postgres":
+            return self.postgres_connector.create_user(next_id, user_data)
+        if db == "scylla":
+            return self.scylla_connector.create_user(next_id,user_data)
+        
+        
         return None
 
-    def create_organization(self, db_type: str, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse | None:
-        if db_type == "postgres":
-            return self.postgres_connector.create_organization(organization_data)
-        if db_type == "duckdb":
-            return self.duck_connector.create_organization(organization_data)
-        if db_type == "scylla":
-            return self.scylla_connector.create_organization(organization_data)
+    def create_organization(self, organization_data: schemas.OrganizationCreate) -> schemas.OrganizationResponse | None:
+        current_id = self.scylla_connector.current_organization_id()
+        next_id = current_id + 1
+        self.scylla_connector.update_organization_sequence(next_id)
+
+        db = id_to_db(next_id)
+        
+
+        if db == "postgres":
+            return self.postgres_connector.create_organization(next_id, organization_data)
+        if db == "scylla":
+            return self.scylla_connector.create_organization(next_id, organization_data)
+        
+        
         return None
 
-    def create_campaign(self, db_type: str, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse | None:
-        if db_type == "postgres":
-            return self.postgres_connector.create_campaign(campaign_data)
-        if db_type == "duckdb":
-            return self.duck_connector.create_campaign(campaign_data)
-        if db_type == "scylla":
-            return self.scylla_connector.create_campaign(campaign_data)
+    def create_campaign(self, campaign_data: schemas.CampaignCreate) -> schemas.CampaignResponse | None:
+        current_id = self.scylla_connector.current_campaign_id()
+        next_id = current_id + 1
+        self.scylla_connector.update_campaign_sequence(next_id)
+
+        db = id_to_db(campaign_data.organizer_id)
+
+        if db == "postgres":
+            return self.postgres_connector.create_campaign(next_id, campaign_data)
+        if db == "scylla":
+            return self.scylla_connector.create_campaign(next_id, campaign_data)
+        
+        
         return None
 
-    def create_application(self, db_type: str, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse | None:
-        if db_type == "postgres":
-            return self.postgres_connector.create_application(application_data)
-        if db_type == "duckdb":
-            return self.duck_connector.create_application(application_data)
-        if db_type == "scylla":
-            return self.scylla_connector.create_application(application_data)
+    def create_application(self, organizer_id: int, application_data: schemas.CampaignApplicationCreate) -> schemas.CampaignApplicationResponse | None:
+        current_id = self.scylla_connector.current_application_id()
+        next_id = current_id + 1
+        self.scylla_connector.update_application_sequence(next_id)
+
+        db = id_to_db(organizer_id)
+
+        if db == "postgres":
+            return self.postgres_connector.create_application(next_id,application_data)
+        if db == "scylla":
+            return self.scylla_connector.create_application(next_id, application_data)
         return None
+
+    # Account methods
+    def create_account(self,  account_data: schemas.AccountCreate) -> schemas.AccountResponse | None:
+
+        return self.scylla_connector.create_account(account_data)
+
+    def update_account(self, account_id: str, account_data: schemas.AccountUpdate) -> schemas.AccountResponse | None:
+        return self.scylla_connector.update_account(account_id, account_data)
+    
+    # Publication methods
+    def all_publications(self, account_id: str | None = None) -> List[schemas.PublicationResponse]:
+        return self.scylla_connector.all_publications(account_id)
+
+    def create_publication(self, publication_data: schemas.PublicationCreate) -> schemas.PublicationResponse | None:
+        return self.scylla_connector.create_publication(publication_data)
+
+    def update_publication(self, publication_id: str, publication_data: schemas.PublicationUpdate) -> schemas.PublicationResponse | None:
+        return self.scylla_connector.update_publication(publication_id, publication_data)
+
+    # User Account methods
+    def all_user_accounts(self, user_id: int) -> List[schemas.UserAccountResponse]:
+        return self.scylla_connector.all_user_accounts(user_id)
+
+    def create_user_account(self, user_account_data: schemas.UserAccountCreate) -> schemas.UserAccountResponse | None:
+        return self.scylla_connector.create_user_account(user_account_data)
+
+    def update_user_account(self, user_account_id: str, user_account_data: schemas.UserAccountUpdate) -> schemas.UserAccountResponse | None:
+        return self.scylla_connector.update_user_account(user_account_id, user_account_data)
+
+    def get_user_account(self, user_account_id: str) -> schemas.UserAccountResponse | None:
+        return self.scylla_connector.get_user_account(user_account_id)
+
+    # User Country methods (Postgres only)
+    def get_user_country(self, user_id: int) -> schemas.CountryResponse | None:
+        """Get user's country information (Postgres only)"""
+        return self.postgres_connector.get_user_country(user_id)
+
+    def set_user_country(self, user_id: int, country_id: int) -> schemas.CountryResponse | None:
+        """Set/update user's country (Postgres only)"""
+        return self.postgres_connector.set_user_country(user_id, country_id)
 
 def get_db_connector() -> Connector:
     return Connector()

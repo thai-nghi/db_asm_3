@@ -155,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch, type PropType } from 'vue'
+import { ref, computed, reactive, type PropType } from 'vue'
 import BaseTable from './BaseTable.vue'
 import Bullhorn from 'vue-material-design-icons/Bullhorn.vue'
 import { useCreateCampaignMutation, useUpdateCampaignMutation } from '@/hooks/mutations'
@@ -170,10 +170,6 @@ const props = defineProps({
     type: Array as PropType<Organization[]>,
     required: true,
   },
-  selectedDatabase: {
-    type: String as PropType<DatabaseType>,
-    required: true,
-  },
   selectedOrganizationId: {
     type: [Number, null] as PropType<number | null>,
     default: null,
@@ -185,13 +181,8 @@ const emit = defineEmits<{
   (e: 'update-organization-filter', organizationId: number | null): void
 }>()
 
-// Database type reactive ref
-const dbTypeRef = ref(props.selectedDatabase)
-
-// Watch for database changes
-watch(() => props.selectedDatabase, (newDb) => {
-  dbTypeRef.value = newDb
-})
+// Database type ref for update mutation (campaigns use postgres by default)
+const dbTypeRef = ref<DatabaseType>('postgres')
 
 // Local filter state that emits changes to parent
 const selectedOrganizationId = computed({
@@ -217,7 +208,7 @@ const formData = reactive({
 })
 
 // Mutations
-const createCampaignMutation = useCreateCampaignMutation(dbTypeRef)
+const createCampaignMutation = useCreateCampaignMutation()
 const updateCampaignMutation = useUpdateCampaignMutation(dbTypeRef)
 
 // Computed properties

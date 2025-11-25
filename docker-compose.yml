@@ -1,10 +1,9 @@
-name: db_asm_3
+name: db_asm_4
 services:
   scylla:
     container_name: scylla
     image: scylladb/scylla:latest
     command: --smp 1 --memory 750M
-    restart: unless-stopped
     ports:
       - 9042:9042
     volumes:
@@ -46,37 +45,35 @@ services:
     networks:
       main:
 
-  backend:
-    container_name: backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - 8000:80
-    depends_on:
-      postgres:
-        condition: service_started
-      scylla:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgresql://asm3:password@postgres:5432/asm3_db
-      - SCYLLA_URL=scylla
-    volumes:
-      - duckdbdata:/app/data
-    networks:
-      main:
+  # backend:
+  #   container_name: backend
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - 8000:80
+  #   depends_on:
+  #     postgres:
+  #       condition: service_started
+  #     scylla:
+  #       condition: service_healthy
+  #   environment:
+  #     - DATABASE_URL=postgresql://asm3:password@postgres:5432/asm3_db
+  #     - SCYLLA_URL=scylla
+  #   networks:
+  #     main:
 
-  frontend:
-    container_name: frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - 5173:5173
-    depends_on:
-      - backend
-    networks:
-      main:
+  # frontend:
+  #   container_name: frontend
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - 5173:5173
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     main:
   
 networks:
   main:
@@ -86,6 +83,4 @@ volumes:
   pgdata:
     driver: local
   scylladata:
-    driver: local
-  duckdbdata:
     driver: local
