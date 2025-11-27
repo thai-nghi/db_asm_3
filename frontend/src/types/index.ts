@@ -39,6 +39,24 @@ export type Application = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
 }
 
+export type Account = {
+  id: string
+  username: string
+  followers: number
+}
+
+export type PublicationInsights = {
+  likes: number
+  comments: number
+}
+
+export type Publication = {
+  id: string
+  account_id: string
+  type: string
+  insights: PublicationInsights
+}
+
 // Database types
 export type DatabaseType = 'postgres' | 'duckdb' | 'scylla'
 

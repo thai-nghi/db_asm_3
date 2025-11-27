@@ -55,7 +55,18 @@ export function useApplicationsQuery(
     });
 }
 
-// ACCOUNT QUERIES (ScyllaDB only)
+
+export function useAccountsQuery(
+    enabled: MaybeRef<boolean> = true
+) {
+    return useQuery({
+        queryKey: ["accounts"],
+        queryFn: async () => {
+            return api.getAccounts();
+        },
+        enabled,
+    });
+}
 
 export function usePublicationsQuery(
     accountId?: Ref<string | null | undefined>,

@@ -695,6 +695,16 @@ class ScyllaConnector:
         row = result_rows[0]
         return schemas.AccountResponse(id=row.id, username=row.username, followers=row.followers)
 
+    def all_accounts(self) -> List[schemas.AccountResponse]:
+        """Get all accounts from ScyllaDB"""
+        query = "SELECT * FROM account"
+        rows = self.session.execute(query)
+        
+        accounts = [schemas.AccountResponse(id=row.id, username=row.username, followers=row.followers) for row in rows]
+        
+        accounts.sort(key=lambda a: str(a.id))
+        return accounts
+
     # Publication functions
     def all_publications(self, account_id: str | None = None) -> List[schemas.PublicationResponse]:
         """Get all publications from ScyllaDB, optionally filtered by account_id"""
@@ -1123,6 +1133,9 @@ class Connector:
     def update_account(self, account_id: str, account_data: schemas.AccountUpdate) -> schemas.AccountResponse | None:
         return self.scylla_connector.update_account(account_id, account_data)
     
+    def all_accounts(self):
+        return self.scylla_connector.all_accounts()
+
     # Publication methods
     def all_publications(self, account_id: str | None = None) -> List[schemas.PublicationResponse]:
         return self.scylla_connector.all_publications(account_id)

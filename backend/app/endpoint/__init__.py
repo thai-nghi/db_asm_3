@@ -143,6 +143,13 @@ async def update_application(
 
 # ACCOUNT ENDPOINTS (ScyllaDB only)
 
+@router.get("/accounts", response_model=list[schemas.AccountResponse])
+async def accounts(
+    db: Connector = fastapi.Depends(get_db_connector)
+) -> list[schemas.AccountResponse]:
+    return db.all_accounts()
+
+
 @router.post("/accounts", response_model=schemas.AccountResponse)
 async def create_account(
     account_data: schemas.AccountCreate,

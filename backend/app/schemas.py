@@ -51,11 +51,16 @@ class AccountResponse(BaseModel):
     followers: int
 
 
+class PublicationInsights(BaseModel):
+    likes: int
+    comments: int
+
+
 class PublicationResponse(BaseModel):
     id: UUID
     account_id: UUID
     type: str
-    insights: Dict[str, Any]  # JSON data
+    insights: PublicationInsights
 
 
 class UserAccountResponse(BaseModel):
@@ -95,7 +100,7 @@ class AccountCreate(BaseModel):
 class PublicationCreate(BaseModel):
     account_id: UUID
     type: str
-    insights: Dict[str, Any]  # JSON data
+    insights: PublicationInsights
 
 
 class UserAccountCreate(BaseModel):
@@ -134,7 +139,7 @@ class AccountUpdate(BaseModel):
 class PublicationUpdate(BaseModel):
     account_id: Optional[UUID] = None
     type: Optional[str] = None
-    insights: Optional[Dict[str, Any]] = None
+    insights: Optional[PublicationInsights] = None
 
 
 class UserAccountUpdate(BaseModel):

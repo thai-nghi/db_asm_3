@@ -13,7 +13,7 @@
       @add="openCreateModal"
       @edit="openEditModal"
       @delete="handleDelete"
-      @row-click="openDetailModal"
+      @row-click="openEditModal"
     >
       <template #cell-email="{ value }">
         <span class="text-primary">{{ value }}</span>
@@ -21,57 +21,140 @@
     </BaseTable>
   </div>
 
-  <!-- Create/Edit Modal -->
+  <!-- Unified User Modal -->
   <dialog ref="userModal" class="modal">
-    <div class="modal-box">
-      <h3 class="text-lg font-bold">
+    <div class="modal-box w-11/12 max-w-3xl">
+      <h3 class="text-lg font-bold mb-4">
         {{ isEditing ? 'Edit User' : 'Create New User' }}
       </h3>
       
-      <form @submit.prevent="handleSubmit" class="space-y-4 mt-4">
-        <!-- Username field -->
-        <div>
-          <label class="label">
-            <span class="label-text">Username</span>
-          </label>
-          <input
-            v-model="formData.username"
-            type="text"
-            class="input input-bordered w-full"
-            placeholder="Enter username"
-            :required="!isEditing"
-          />
+      <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Basic Information Section -->
+        <div class="card bg-base-200 shadow-sm">
+          <div class="card-body p-4">
+            <h4 class="card-title text-sm uppercase text-primary mb-2">Basic Information</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Username field -->
+              <div>
+                <label class="label">
+                  <span class="label-text">Username</span>
+                </label>
+                <input
+                  v-model="formData.username"
+                  type="text"
+                  class="input input-bordered w-full"
+                  placeholder="Enter username"
+                  :required="!isEditing"
+                />
+              </div>
+
+              <!-- Email field -->
+              <div>
+                <label class="label">
+                  <span class="label-text">Email</span>
+                </label>
+                <input
+                  v-model="formData.email"
+                  type="email"
+                  class="input input-bordered w-full"
+                  placeholder="Enter email"
+                  :required="!isEditing"
+                />
+              </div>
+
+              <!-- Password field -->
+              <div class="md:col-span-2">
+                <label class="label">
+                  <span class="label-text">
+                    {{ isEditing ? 'New Password (optional)' : 'Password' }}
+                  </span>
+                </label>
+                <input
+                  v-model="formData.password"
+                  type="password"
+                  class="input input-bordered w-full"
+                  placeholder="Enter password"
+                  :required="!isEditing"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Email field -->
-        <div>
-          <label class="label">
-            <span class="label-text">Email</span>
-          </label>
-          <input
-            v-model="formData.email"
-            type="email"
-            class="input input-bordered w-full"
-            placeholder="Enter email"
-            :required="!isEditing"
-          />
-        </div>
+        <!-- Extended Information (Only for Edit Mode) -->
+        <template v-if="isEditing && editingUser">
+          <!-- Country Section -->
+          <div class="card bg-base-200 shadow-sm">
+            <div class="card-body p-4">
+              <h4 class="card-title text-sm uppercase text-secondary mb-2">Country</h4>
+              <div class="form-control">
+                <select 
+                  v-model.number="countryForm.countryId" 
+                  class="select select-bordered w-full"
+                >
+                  <option :value="0">Select a country</option>
+                  <option 
+                    v-for="country in countriesQuery.data.value" 
+                    :key="country.id" 
+                    :value="country.id"
+                  >
+                    {{ country.code }} (ID: {{ country.id }})
+                  </option>
+                </select>
+                <div class="label">
+                  <span class="label-text-alt text-info" v-if="countryForm.isDirty">
+                    Click "Update" at the bottom to save country changes.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <!-- Password field -->
-        <div>
-          <label class="label">
-            <span class="label-text">
-              {{ isEditing ? 'New Password (optional)' : 'Password' }}
-            </span>
-          </label>
-          <input
-            v-model="formData.password"
-            type="password"
-            class="input input-bordered w-full"
-            placeholder="Enter password"
-            :required="!isEditing"
-          />
-        </div>
+          <!-- Accounts Section -->
+          <div class="card bg-base-200 shadow-sm">
+            <div class="card-body p-4">
+              <div class="flex justify-between items-center mb-3">
+                <h4 class="card-title text-sm uppercase text-accent">Social Media Accounts</h4>
+                <button 
+                  type="button"
+                  class="btn btn-xs btn-accent btn-outline"
+                  @click="openAccountCreateModal"
+                >
+                  Add Account
+                </button>
+              </div>
+
+              <div v-if="userAccountsQuery.isPending.value" class="loading loading-spinner loading-sm"></div>
+              <div v-else-if="userAccountsQuery.data.value && userAccountsQuery.data.value.length > 0">
+                <div class="space-y-2">
+                  <div 
+                    v-for="userAccount in userAccountsQuery.data.value" 
+                    :key="userAccount.id"
+                    class="flex justify-between items-center p-2 bg-base-100 rounded-lg border border-base-300"
+                  >
+                    <div class="text-sm">
+                      <div class="font-medium flex items-center gap-2">
+                        <span class="text-primary">{{ getAccountDetails(userAccount.account_id)?.username || 'Unknown' }}</span>
+                        <span class="badge badge-sm badge-ghost">{{ getAccountDetails(userAccount.account_id)?.followers || 0 }} followers</span>
+                      </div>
+                      <div class="text-xs opacity-50">ID: {{ userAccount.account_id }}</div>
+                    </div>
+                    <button 
+                      type="button"
+                      class="btn btn-xs btn-ghost text-accent"
+                      @click="openAccountEditModal(userAccount)"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-sm text-gray-500 italic">
+                No accounts linked.
+              </div>
+            </div>
+          </div>
+        </template>
 
         <!-- Modal Actions -->
         <div class="modal-action">
@@ -89,7 +172,7 @@
             :disabled="isSubmitting"
           >
             <span v-if="isSubmitting" class="loading loading-spinner loading-sm"></span>
-            {{ isEditing ? 'Update' : 'Create' }}
+            {{ isEditing ? 'Update User' : 'Create User' }}
           </button>
         </div>
       </form>
@@ -99,171 +182,7 @@
     </form>
   </dialog>
 
-  <!-- User Detail Modal -->
-  <dialog ref="detailModal" class="modal">
-    <div class="modal-box w-11/12 max-w-2xl">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold">User Details</h3>
-        <button 
-          class="btn btn-sm btn-circle btn-ghost"
-          @click="closeDetailModal"
-        >
-          ✕
-        </button>
-      </div>
-
-      <div v-if="selectedUser" class="space-y-6">
-        <!-- Basic User Information -->
-        <div class="card bg-base-200 shadow-sm">
-          <div class="card-body p-4">
-            <h4 class="card-title text-primary">Basic Information</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <span class="text-sm opacity-70">ID:</span>
-                <div class="badge badge-primary">{{ selectedUser.id }}</div>
-              </div>
-              <div>
-                <span class="text-sm opacity-70">Username:</span>
-                <div class="font-medium">{{ selectedUser.username }}</div>
-              </div>
-              <div class="sm:col-span-2">
-                <span class="text-sm opacity-70">Email:</span>
-                <div class="text-primary">{{ selectedUser.email }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Country Information -->
-        <div class="card bg-base-200 shadow-sm">
-          <div class="card-body p-4">
-            <div class="flex justify-between items-center mb-3">
-              <h4 class="card-title text-secondary">Country</h4>
-              <button 
-                class="btn btn-sm btn-secondary btn-outline"
-                @click="openCountryEditModal"
-              >
-                Edit Country
-              </button>
-            </div>
-            
-            <div v-if="userCountryQuery.isPending.value" class="loading loading-spinner loading-sm"></div>
-            <div v-else-if="userCountryQuery.error.value" class="text-error">
-              Failed to load country information
-            </div>
-            <div v-else-if="userCountryQuery.data.value" class="flex items-center gap-2">
-              <span class="badge badge-secondary">{{ userCountryQuery.data.value.code }}</span>
-              <span>Country ID: {{ userCountryQuery.data.value.id }}</span>
-            </div>
-            <div v-else class="flex items-center gap-2">
-              <span class="text-gray-500 italic">No country set</span>
-              <span class="text-xs opacity-50">(Click "Edit Country" to set one)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- User Accounts -->
-        <div class="card bg-base-200 shadow-sm">
-          <div class="card-body p-4">
-            <div class="flex justify-between items-center mb-3">
-              <h4 class="card-title text-accent">Social Media Accounts</h4>
-              <button 
-                class="btn btn-sm btn-accent btn-outline"
-                @click="openAccountCreateModal"
-              >
-                Add Account
-              </button>
-            </div>
-
-            <div v-if="userAccountsQuery.isPending.value" class="loading loading-spinner loading-sm"></div>
-            <div v-else-if="userAccountsQuery.error.value" class="text-error">
-              Failed to load accounts
-            </div>
-            <div v-else-if="userAccountsQuery.data.value && userAccountsQuery.data.value.length > 0">
-              <div class="space-y-3">
-                <div 
-                  v-for="userAccount in userAccountsQuery.data.value" 
-                  :key="userAccount.id"
-                  class="flex justify-between items-center p-3 bg-base-100 rounded-lg"
-                >
-                  <div>
-                    <div class="font-medium">Account: {{ userAccount.account_id }}</div>
-                    <div class="text-sm opacity-70">User Account ID: {{ userAccount.id }}</div>
-                  </div>
-                  <button 
-                    class="btn btn-sm btn-ghost text-accent"
-                    @click="openAccountEditModal(userAccount)"
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div v-else class="flex items-center gap-2">
-              <span class="text-gray-500 italic">No accounts linked</span>
-              <span class="text-xs opacity-50">(Click "Add Account" to link one)</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <form method="dialog" class="modal-backdrop">
-      <button type="button" @click="closeDetailModal">close</button>
-    </form>
-  </dialog>
-
-  <!-- Country Edit Modal -->
-  <dialog ref="countryModal" class="modal">
-    <div class="modal-box">
-      <h3 class="text-lg font-bold">Update User Country</h3>
-      
-      <form @submit.prevent="handleCountrySubmit" class="space-y-4 mt-4">
-        <div>
-          <label class="label">
-            <span class="label-text">Country</span>
-          </label>
-          <select 
-            v-model.number="countryForm.countryId" 
-            class="select select-bordered w-full"
-            required
-          >
-            <option disabled value="0">Select a country</option>
-            <option 
-              v-for="country in countriesQuery.data.value" 
-              :key="country.id" 
-              :value="country.id"
-            >
-              {{ country.code }} (ID: {{ country.id }})
-            </option>
-          </select>
-        </div>
-
-        <div class="modal-action">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            @click="closeCountryModal"
-            :disabled="setCountryMutation.isPending.value"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="btn btn-secondary"
-            :disabled="setCountryMutation.isPending.value"
-          >
-            <span v-if="setCountryMutation.isPending.value" class="loading loading-spinner loading-sm"></span>
-            Update Country
-          </button>
-        </div>
-      </form>
-    </div>
-    <form method="dialog" class="modal-backdrop">
-      <button type="button" @click="closeCountryModal">close</button>
-    </form>
-  </dialog>
-
-  <!-- Account Create/Edit Modal -->
+  <!-- Account Create/Edit Modal (Sub-modal) -->
   <dialog ref="accountModal" class="modal">
     <div class="modal-box">
       <h3 class="text-lg font-bold">
@@ -271,7 +190,6 @@
       </h3>
       
       <form @submit.prevent="handleAccountSubmit" class="space-y-4 mt-4">
-        <!-- Create new account fields -->
         <template v-if="!editingUserAccount">
           <div>
             <label class="label">
@@ -300,12 +218,6 @@
           </div>
         </template>
 
-        <!-- Edit existing link (only allows changing account ID if needed, but usually we might want to edit the account itself? 
-             The requirement says "add a new account", so for edit we might keep it simple or just allow relinking. 
-             Let's assume for edit we still just link by ID or maybe we shouldn't allow editing link this way?
-             The original code allowed editing the account_id in the link. 
-             Let's keep the original behavior for EDIT, but change for CREATE.
-        -->
         <div v-else>
           <label class="label">
             <span class="label-text">Account ID</span>
@@ -346,7 +258,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, type PropType } from 'vue'
+import { ref, reactive, computed, type PropType, watch } from 'vue'
 import BaseTable from './BaseTable.vue'
 import AccountGroup from 'vue-material-design-icons/AccountGroup.vue'
 import { 
@@ -357,7 +269,7 @@ import {
   useUpdateUserAccountMutation,
   useCreateAccountMutation
 } from '@/hooks/mutations'
-import { useUserCountryQuery, useUserAccountsQuery, useCountriesQuery } from '@/hooks/queries'
+import { useUserCountryQuery, useUserAccountsQuery, useCountriesQuery, useAccountsQuery } from '@/hooks/queries'
 import type { UserResponse, UserAccountResponse } from '@/api'
 
 const props = defineProps({
@@ -371,15 +283,13 @@ const emit = defineEmits<{
   (e: 'delete', user: UserResponse): void
 }>()
 
-// Modal refs and state
+// Modal refs
 const userModal = ref<HTMLDialogElement>()
-const detailModal = ref<HTMLDialogElement>()
-const countryModal = ref<HTMLDialogElement>()
 const accountModal = ref<HTMLDialogElement>()
 
+// State
 const isEditing = ref(false)
 const editingUser = ref<UserResponse | null>(null)
-const selectedUser = ref<UserResponse | null>(null)
 const editingUserAccount = ref<UserAccountResponse | null>(null)
 
 // Form data
@@ -391,6 +301,7 @@ const formData = reactive({
 
 const countryForm = reactive({
   countryId: 0,
+  isDirty: false,
 })
 
 const accountForm = reactive({
@@ -407,25 +318,45 @@ const createUserAccountMutation = useCreateUserAccountMutation()
 const updateUserAccountMutation = useUpdateUserAccountMutation()
 const createAccountMutation = useCreateAccountMutation()
 
-// Computed properties for selected user queries
-const selectedUserId = computed(() => selectedUser.value?.id ?? 0)
-
+// Queries
+const selectedUserId = computed(() => editingUser.value?.id ?? 0)
 const countriesQuery = useCountriesQuery()
+const accountsQuery = useAccountsQuery()
 
-// Conditional queries - only run when user is selected
 const userCountryQuery = useUserCountryQuery(
   selectedUserId,
-  computed(() => !!selectedUser.value)
+  computed(() => isEditing.value && !!editingUser.value)
 )
 
 const userAccountsQuery = useUserAccountsQuery(
   selectedUserId,
-  computed(() => !!selectedUser.value)
+  computed(() => isEditing.value && !!editingUser.value)
 )
+
+// Helper to get account details
+const getAccountDetails = (accountId: string) => {
+  return accountsQuery.data.value?.find(a => a.id === accountId)
+}
+
+// Watchers to populate country form when data loads
+watch(() => userCountryQuery.data.value, (newCountry) => {
+  if (newCountry) {
+    countryForm.countryId = newCountry.id
+  } else {
+    countryForm.countryId = 0
+  }
+  countryForm.isDirty = false
+})
+
+watch(() => countryForm.countryId, () => {
+  countryForm.isDirty = true
+})
 
 // Computed properties
 const isSubmitting = computed(() => 
-  createUserMutation.isPending.value || updateUserMutation.isPending.value
+  createUserMutation.isPending.value || 
+  updateUserMutation.isPending.value ||
+  setCountryMutation.isPending.value
 )
 
 const accountSubmitting = computed(() =>
@@ -440,7 +371,7 @@ const columns = [
   { key: 'email', label: 'Email', type: 'accent' as const, accentClass: 'text-primary' },
 ]
 
-// Modal functions for user CRUD
+// Modal functions
 const openCreateModal = () => {
   isEditing.value = false
   editingUser.value = null
@@ -460,33 +391,6 @@ const closeModal = () => {
   resetForm()
 }
 
-// Detail modal functions
-const openDetailModal = (user: UserResponse) => {
-  selectedUser.value = user
-  detailModal.value?.showModal()
-}
-
-const closeDetailModal = () => {
-  selectedUser.value = null
-  detailModal.value?.close()
-}
-
-// Country modal functions
-const openCountryEditModal = () => {
-  if (selectedUser.value && userCountryQuery.data.value) {
-    countryForm.countryId = userCountryQuery.data.value.id
-  } else {
-    countryForm.countryId = 0
-  }
-  countryModal.value?.showModal()
-}
-
-const closeCountryModal = () => {
-  countryForm.countryId = 0
-  countryModal.value?.close()
-}
-
-// Account modal functions
 const openAccountCreateModal = () => {
   editingUserAccount.value = null
   accountForm.accountId = ''
@@ -512,12 +416,14 @@ const resetForm = () => {
   formData.username = ''
   formData.email = ''
   formData.password = ''
+  countryForm.countryId = 0
+  countryForm.isDirty = false
 }
 
 const fillForm = (user: UserResponse) => {
   formData.username = user.username
   formData.email = user.email
-  formData.password = '' // Don't pre-fill password for security
+  formData.password = ''
 }
 
 // Submit handlers
@@ -534,6 +440,14 @@ const handleSubmit = async () => {
         userId: editingUser.value.id,
         userData: updateData,
       })
+
+      // Update country if changed
+      if (countryForm.isDirty) {
+        await setCountryMutation.mutateAsync({
+          userId: editingUser.value.id,
+          countryId: countryForm.countryId,
+        })
+      }
     } else {
       // Create new user
       await createUserMutation.mutateAsync({
@@ -549,22 +463,8 @@ const handleSubmit = async () => {
   }
 }
 
-const handleCountrySubmit = async () => {
-  if (!selectedUser.value) return
-  
-  try {
-    await setCountryMutation.mutateAsync({
-      userId: selectedUser.value.id,
-      countryId: countryForm.countryId,
-    })
-    closeCountryModal()
-  } catch (error) {
-    console.error('Error updating country:', error)
-  }
-}
-
 const handleAccountSubmit = async () => {
-  if (!selectedUser.value) return
+  if (!editingUser.value) return
   
   try {
     if (editingUserAccount.value) {
@@ -584,7 +484,7 @@ const handleAccountSubmit = async () => {
       
       // Then link it to the user
       await createUserAccountMutation.mutateAsync({
-        user_id: selectedUser.value.id,
+        user_id: editingUser.value.id,
         account_id: newAccount.id,
       })
     }

@@ -53,11 +53,16 @@ export const AccountResponseSchema = z.object({
   followers: z.number(),
 })
 
+export const PublicationInsightsSchema = z.object({
+  likes: z.number(),
+  comments: z.number(),
+})
+
 export const PublicationResponseSchema = z.object({
   id: z.string(),
   account_id: z.string(),
   type: z.string(),
-  insights: z.record(z.string(), z.any()),
+  insights: PublicationInsightsSchema,
 })
 
 export const UserAccountResponseSchema = z.object({
@@ -103,7 +108,7 @@ export const AccountCreateSchema = z.object({
 export const PublicationCreateSchema = z.object({
   account_id: z.string(),
   type: z.string(),
-  insights: z.record(z.string(), z.any()),
+  insights: PublicationInsightsSchema,
 })
 
 export const UserAccountCreateSchema = z.object({
@@ -148,7 +153,7 @@ export const AccountUpdateSchema = z.object({
 export const PublicationUpdateSchema = z.object({
   account_id: z.string().optional(),
   type: z.string().optional(),
-  insights: z.record(z.string(), z.any()).optional(),
+  insights: PublicationInsightsSchema.optional(),
 })
 
 export const UserAccountUpdateSchema = z.object({
@@ -321,6 +326,11 @@ export async function updateApplication(organizerId: number, applicationId: numb
 
 // ACCOUNT ENDPOINTS (ScyllaDB only)
 
+export async function getAccounts() {
+  const response = await apiRequest<AccountResponse[]>('/accounts')
+  return z.array(AccountResponseSchema).parse(response)
+}
+
 export async function createAccount(accountData: AccountCreate) {
   const response = await apiRequest<AccountResponse>('/accounts', {
     method: 'POST',
@@ -444,6 +454,7 @@ const api = {
   updateApplication,
 
   // Accounts
+  getAccounts,
   createAccount,
   updateAccount,
 

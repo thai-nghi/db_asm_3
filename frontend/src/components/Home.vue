@@ -42,6 +42,13 @@
           :users="users || []"
           @delete="handleDeleteApplication"
         />
+
+        <!-- Publications Tab -->
+        <input type="radio" name="db_tabs" class="tab" aria-label="📰 Publications" />
+        <PublicationTable
+          :accounts="accounts || []"
+          @delete="handleDeletePublication"
+        />
       </div>
 
     </div>
@@ -54,8 +61,9 @@ import UserTable from './UserTable.vue'
 import OrganizationTable from './OrganizationTable.vue'
 import CampaignTable from './CampaignTable.vue'
 import ApplicationsTable from './ApplicationsTable.vue'
-import { useUsersQuery, useOrganizationsQuery, useCampaignsQuery } from '@/hooks/queries'
-import type { User, Organization, CampaignData, Application } from '../types'
+import PublicationTable from './PublicationTable.vue'
+import { useUsersQuery, useOrganizationsQuery, useCampaignsQuery, useAccountsQuery } from '@/hooks/queries'
+import type { User, Organization, CampaignData, Application, Publication } from '../types'
 
 // Organization filter for campaigns (null = all campaigns)
 const selectedOrganizationId = ref<number | null>(null)
@@ -64,6 +72,7 @@ const selectedOrganizationId = ref<number | null>(null)
 const { data: users } = useUsersQuery()
 const { data: organizations } = useOrganizationsQuery()
 const { data: campaigns } = useCampaignsQuery(selectedOrganizationId)
+const { data: accounts } = useAccountsQuery()
 
 // Event handlers for delete operations (create/edit handled internally)
 const handleDeleteUser = (user: User) => {
@@ -80,6 +89,10 @@ const handleDeleteCampaign = (campaign: CampaignData) => {
 
 const handleDeleteApplication = (application: Application) => {
   console.log('Delete application', application)
+}
+
+const handleDeletePublication = (publication: Publication) => {
+  console.log('Delete publication', publication)
 }
 
 // Organization filter handler for campaigns
